@@ -2,7 +2,7 @@
 
 ![TPT](https://cdn.discordapp.com/attachments/915279530338422837/981989977669898320/unknown.png)
 
-My own party cooldown tracker addon based on ArenaTeamTracker. Performance enhancements and additional features added. OmniCD animations & glows when auras active/used. CompactRaidFrames support.
+My own party cooldown tracker addon based on Ability Team Tracker/Party Ability Bars. Performance enhancements and additional features added. OmniCD animations & glows when auras active/used. CompactRaidFrames support.
 
 **Game Version(s) Supported:** 3.3.5 (Requires [LibCompat335](https://gitlab.com/Tsoukie/libcompat335)), 3.4.0+ (*Classic*)
 
