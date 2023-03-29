@@ -7,7 +7,7 @@ My own party cooldown tracker addon based on ArenaTeamTracker. Performance enhan
 **Game Version(s) Supported:** 3.3.5, 3.4.0+ (*Classic*)
 
 # Install
-1. Download the latest version [here](https://gitlab.com/Tsoukie/tsoukiepartytracker/-/archive/master/tpt-master.zip).
+1. Download the latest version [here](https://gitlab.com/Tsoukie/tsoukiepartytracker/-/archive/main/tsoukiepartytracker-main.zip).
 2. Extract files within the compressed .ZIP file.
 3. Rename extracted folder to "TPT".
 4. Move renamed folder to your Interface\AddOns\ folder.
