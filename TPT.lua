@@ -1027,10 +1027,6 @@ end
 function ATT:COMBAT_LOG_EVENT_UNFILTERED(...)
 	local _, Event, _, SourceGUID, _, _, _, DestGUID, _, _, _, SpellID, SpellName, _, SpellType = CombatLogGetCurrentEventInfo(...)
 
-	--[[if ( not Event ) then
-		_, Event, SourceGUID, _, _, DestGUID, _, _, SpellID, SpellName, _, SpellType = ...
-	end]]
-
 	local AuraEvent = (Event == "SPELL_AURA_REMOVED") or (Event == "SPELL_AURA_APPLIED")
 	local CastEvent = (Event == "SPELL_CAST_SUCCESS")
 
