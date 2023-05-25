@@ -234,8 +234,8 @@ b.dbRacial = {
 }
 
 b.dbTrinket = {
-	{["ability"] = 42292, ["id"] = 42292, ["cooldown"] = 120},
-	{["ability"] = 59752, ["id"] = 59752, ["cooldown"] = 120}
+	{42292, 120},
+	{59752, 120},
 }
 
 b.dbSpecs = {

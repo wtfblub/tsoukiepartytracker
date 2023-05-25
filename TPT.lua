@@ -209,7 +209,7 @@ end
 local function ConvertTrinket(Index)
 	for i=1, #dbTrinket do
 		local Trinket = dbTrinket[i]
-		Trinket.ability = GetSpellInfo(Trinket.id)
+		Trinket[3] = GetSpellInfo(Trinket[1])
 	end
 end
 
@@ -649,7 +649,7 @@ function ATT:UpdateAnchor(unit, i, PvPTrinket, TraceID, tcooldown)
 
 	-- PvP Trinket
 	if ( db.Trinket ) then 
-		local ability, id, cooldown = PvPTrinket.ability, PvPTrinket.id, PvPTrinket.cooldown
+		local id, cooldown, ability = PvPTrinket[1], PvPTrinket[2], PvPTrinket[3]
 		local icon = icons[numIcons] or self:AddIcon(icons,anchor)
 		icon.texture:SetTexture(TraceID)
 		icon.GUID = anchor.GUID
@@ -667,7 +667,7 @@ function ATT:UpdateAnchor(unit, i, PvPTrinket, TraceID, tcooldown)
 			icon.Stop()
 		end
 		numIcons = numIcons + 1
-	elseif icons[1] and (icons[1].ability == dbTrinket[1].ability or icons[1].ability == dbTrinket[2].ability) then
+	elseif icons[1] and (icons[1].ability == dbTrinket[1][3] or icons[1].ability == dbTrinket[2][3]) then
 		icons[1]:Hide()
 		icons[1].showing = nil
 		icons[1].inUse = nil
@@ -991,7 +991,7 @@ function ATT:StartCooldown(SpellName, Anchor)
 		else
 			-- Undead Racial <-> PvP Trinket (45s)
 			if ( Anchor.race == "Scourge" ) then
-				local Trinket = dbTrinket[1].ability
+				local Trinket = dbTrinket[1][3]
 				if ( (Icon.ability == RACIAL_UNDEAD and SpellName == Trinket) or (Icon.ability == Trinket and SpellName == RACIAL_UNDEAD) ) then
 					if ( not Icon.active ) then
 						Icon.Start(45)
