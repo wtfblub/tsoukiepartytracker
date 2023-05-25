@@ -1,13 +1,12 @@
 ## Interface: 30300
 ## Author Tsoukie
 ## Title: Tsoukie Party Tracker
-## Version: 1.0
+## Version: 1.0.1
 ## Notes: Track all selected cooldowns of your party members.
-## SavedVariables: ATTDB
+## SavedVariables: TPTDB
 
 libs\TsoGlow\Frames.xml
-libs\LibSimpleOptions-1.01.lua
-Spells\spell_lib_defaults.lua
-Spells\spell_lib_modif.lua
+libs\LibSimpleOptions-1.0.lua
+spells\default.lua
 
 TPT.lua

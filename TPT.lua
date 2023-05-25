@@ -1,7 +1,13 @@
-local addon, SPELLDB = ...
+local V = 7.54
+
 local addon, ATTdefault = ...
+
 local match = string.match
 local remove = table.remove
+local insert = table.insert
+local sort = table.sort
+local tonumber = tonumber
+local tostring = tostring
 local GetSpellInfo = GetSpellInfo
 local UnitClass = UnitClass
 local UnitGUID = UnitGUID
@@ -10,7 +16,8 @@ local UnitRace = UnitRace
 local CooldownFrame_Set = CooldownFrame_Set
 local Timer = C_Timer.NewTicker
 local TimerAfter = C_Timer.After
-local V = 7.53
+local LOCALIZED_CLASS_NAMES_MALE = LOCALIZED_CLASS_NAMES_MALE
+local UIParent = UIParent
 
 local ENABLED
 
@@ -22,16 +29,15 @@ local PLAYER_FACTION
 local PARTY_NUM
 local PARTY_NUM_PREVIOUS
 
-local __CompactRaidFrame = false
+local __CRF = false
 
 local db
-local dbModif = dbModif
-local dbTrinket = dbTrinket
+local dbRacial = ATTdefault.dbRacial
+local dbTrinket = ATTdefault.dbTrinket
 
-local ATT = CreateFrame("Frame","ATT",UIParent)
-local ATTIcons = CreateFrame("Frame",nil,UIParent)
-local ATTAnchor = CreateFrame("Frame",nil,UIParent)
-local ATTTooltip = CreateFrame("GameTooltip", "ATTGameTooltip", nil, "GameTooltipTemplate")
+local ATT = CreateFrame("Frame", "ATT", UIParent)
+local ATTIcons = CreateFrame("Frame", nil, UIParent)
+local ATTAnchor = CreateFrame("Frame", nil, UIParent)
 
 local INSPECT_FRAME
 local INSPECT_CURRENT
@@ -39,18 +45,22 @@ local QUERY_SPEC_TICK
 local QUERY_SPEC_TICK_TIMEOUT
 local GROUP_ROSTER_UPDATE_DELAY_QUEUED
 
-local TRINKET_HUMAN = "Will to Survive"
 local GROUP_ROSTER_UPDATE = "GROUP_ROSTER_UPDATE"
 local INSPECT_READY = "INSPECT_READY"
+local HEX
+local FERAL_CHARGE
+local FERAL_CHARGE_CAT
+local FERAL_CHARGE_BEAR
+local RACIAL_UNDEAD
+local TRINKET_ALLIANCE
+local TRINKET_HORDE
 
 -- Compat
 if ( GetBuildInfo() == "3.3.5" ) then
-	TRINKET_HUMAN = "Every Man for Himself"
 	GROUP_ROSTER_UPDATE = "PARTY_MEMBERS_CHANGED"
 	INSPECT_READY = "INSPECT_TALENT_READY"
 end
 
-local iconlist = {}
 local anchors = {}
 local activeGUIDS = {}
 
@@ -83,11 +93,14 @@ local groupedCooldowns = {
 		[13809] = 1, -- Frost Trap
 		[49067] = 2, -- Explosive Trap
 		[49056] = 2, -- Immolation Trap
-		[34600] = 3, -- Snake Trap
 	},
 	["MAGE"] = {
 		[43010] = 1,  -- Fire Ward
 		[43012] = 1,  -- Frost Ward
+	},
+	["WARRIOR"] = {
+		[72] = 1, -- Shield Bash
+		[6552] = 1, -- Pummel
 	},
 }
 
@@ -109,8 +122,8 @@ local cooldownResetters = {
 		[11305] = 1, -- Sprint
 		[26889] = 1, -- Vanish
 		[36554] = 1, -- Shadowstep
-		[1766] = 10, -- Kick
-		[51722] = 60,-- Dismantle
+		[1766] = 1, -- Kick
+		[51722] = 1,-- Dismantle
 	},
 	[23989] = { -- Readiness
 		[19503] = 1, -- Scatter Shot
@@ -126,80 +139,92 @@ local cooldownResetters = {
 }
 
 local function GetSpellTexture(id)
-	local icon = select(3, GetSpellInfo(id))
+	local _, _, icon = GetSpellInfo(id)
 	return icon
 end
 
-local function convertspellids(t)
-	local temp = {}
-	for class, table in pairs(t) do
-		temp[class] = {}
-		for spec, spells in pairs(table) do
-			spec = tostring(spec)
-			temp[class][spec] = {}
-			for k, spell in pairs(spells) do
-				local spellInfo = GetSpellInfo(spell[1])
-				if spellInfo then temp[class][spec][#temp[class][spec]+1] = { ability = spellInfo, cooldown = spell[2], id = spell[1], talent = spell.talent } end
+local function PrepareDefaultSpells()
+	local Temp = {}
+
+	for Class, Table in pairs(ATTdefault.defaultAbilities) do
+		Temp[Class] = {}
+
+		for Spec, Spells in pairs(Table) do
+			Temp[Class][Spec] = {}
+
+			for _, Spell in pairs(Spells) do
+				local SpellID = Spell[1]
+				local SpellName = GetSpellInfo(SpellID)
+
+				if ( SpellName ) then
+					Temp[Class][Spec][#Temp[Class][Spec]+1] = { ability = SpellName, cooldown = Spell[2], id = SpellID }
+				end
 			end
 		end
 	end
-	return temp
+
+	return Temp
 end
 
-local ATTdefaultAbilities = convertspellids(ATTdefault.defaultAbilities)
+local function ConvertSpells(Table)
+	local Temp = {}
 
-local function Gconvertspellids(t)
-	local temp = {}
-	for class,spells in pairs(t) do
-		temp[class] = {}
-		for spell, k in pairs(spells) do
-			local spellName = GetSpellInfo(spell)
-			if spellName then
-				temp[class][spellName] = k
+	for Class, Spells in pairs(Table) do
+		Temp[Class] = {}
+
+		for Spell, Value in pairs(Spells) do
+			local SpellName = GetSpellInfo(Spell)
+
+			if ( SpellName ) then
+				Temp[Class][SpellName] = Value
 			end
 		end
 	end
-	return temp
-end
-groupedCooldowns = Gconvertspellids(groupedCooldowns)
-dbSpecAbilities = Gconvertspellids(dbSpecAbilities)
-overallCooldowns = Gconvertspellids(overallCooldowns)
 
-local temp = {}
-for k, v in pairs(cooldownResetters) do
-	local spellInfo = GetSpellInfo(k)
-	if spellInfo then
-		temp[spellInfo] = {}
-		if type(v) == "table" then
-			for id in pairs(v) do
-				local spellInfo2 = GetSpellInfo(id)
-				if spellInfo2 then temp[spellInfo][spellInfo2] = 1 end
-			end
-		else
-			local spellInfo3 = GetSpellInfo(k)
-			if spellInfo3 then
-				temp[spellInfo3] = v
+	return Temp
+end
+
+local function ConvertReset(Table)
+	local Temp = {}
+
+	for Reset, Spells in pairs(cooldownResetters) do
+		local ResetName = GetSpellInfo(Reset)
+
+		if ( ResetName ) then
+			Temp[ResetName] = {}
+
+			for SpellID in pairs(Spells) do
+				local SpellName = GetSpellInfo(SpellID)
+
+				if ( SpellName ) then
+					Temp[ResetName][SpellName] = 1
+				end
 			end
 		end
 	end
+
+	return Temp
 end
 
-cooldownResetters = temp
-temp = nil
-convertspellids = nil
+local function ConvertTrinket(Index)
+	for i=1, #dbTrinket do
+		local Trinket = dbTrinket[i]
+		Trinket.ability = GetSpellInfo(Trinket.id)
+	end
+end
 
 local function ValidZoneType()
-	if (db.arena and CURRENT_ZONE_TYPE == "arena") or
-	   (db.dungeons and CURRENT_ZONE_TYPE == "party") or
-	   (db.inraid and (CURRENT_ZONE_TYPE == "raid" or CURRENT_ZONE_TYPE == "pvp") ) or
-	   (db.outside and CURRENT_ZONE_TYPE == "none")
+	if (db.Arena and CURRENT_ZONE_TYPE == "arena") or
+	   (db.Dungeon and CURRENT_ZONE_TYPE == "party") or
+	   (db.Raid and (CURRENT_ZONE_TYPE == "raid" or CURRENT_ZONE_TYPE == "pvp") ) or
+	   (db.World and CURRENT_ZONE_TYPE == "none")
 	then
 		return 1
 	end
 end
 
 local function Lock()
-	if db.lock then ATTAnchor:Hide() else ATTAnchor:Show() end
+	if ( db.Lock ) then ATTAnchor:Hide() else ATTAnchor:Show() end
 end
 
 -- Player Inspect
@@ -237,50 +262,55 @@ function ATT:QuerySpecInfo()
 	if not INSPECT_FRAME then
 		INSPECT_FRAME = CreateFrame("Frame")
 		INSPECT_FRAME:SetScript("OnEvent", function (self, event, ...)
-			-- are we fighting
-			if InCombatLockdown() then return end
-			-- is the player inspecting
-			if InspectFrame and InspectFrame:IsShown() then return end
+			if ( (InCombatLockdown()) or (InspectFrame and InspectFrame:IsShown()) or (not INSPECT_CURRENT) ) then return end
 
-			if not INSPECT_CURRENT then return end
-			
 			local anchor = anchors[INSPECT_CURRENT]
-			
-			if not anchor or not anchor.class then
+
+			if ( not anchor or not anchor.class ) then
 				-- anchor not yet created
 				INSPECT_CURRENT = nil
 				return
 			end
 
-			local SpecSpells = dbSpecAbilities[anchor.class]
+			anchor.spec = {}
+			local Found
+			local TalentGroup = GetActiveTalentGroup(true)
 
-			if ( SpecSpells ) then
-				anchor.spec = {}
-				local Found
-				local TalentGroup = GetActiveTalentGroup(true)
+			for Tab = 1, 3 do
+				for Talent = 1, 31 do
+					local Name, _, _, _, Spent = GetTalentInfo(Tab, Talent, true, false, TalentGroup)
 
-				for Tab = 1, 3 do
-					for Talent = 1, 31 do
-						local Name, _, _, _, Spent = GetTalentInfo(Tab, Talent, true, false, TalentGroup)
+					if ( Name ) then
+						local Spent = Spent > 0
 
-						if ( Name ) then
-							local Spent = Spent > 0
+						if ( Spent ) then
+							-- Feral Charge
+							if ( Name == FERAL_CHARGE ) then
+								anchor.spec[FERAL_CHARGE_CAT] = 1
+								Name = FERAL_CHARGE_BEAR
+							end
 
-							if ( Spent ) then
-								if ( SpecSpells[Name] ) then
-									Found = true
-									anchor.spec[Name] = Spent
+							for SpecID, SpellList in pairs(db.Spells[anchor.class]) do
+								if ( SpecID ~= "*" ) then
+									for Index, Spell in pairs(SpellList) do
+										if ( Spell.ability == Name ) then
+											Found = true
+											anchor.spec[Name] = Spent
+											break
+										end
+									end
 								end
 							end
 						end
 					end
 				end
+			end
 
-				if ( not Found ) then
-					anchor.spec = nil
-				else
-					ATT:TrinketCheck("party"..INSPECT_CURRENT, INSPECT_CURRENT) -- Update icons for unit.
-				end
+			if ( not Found ) then
+				anchor.spec = nil
+			else
+				-- Update with new spec.
+				ATT:TrinketCheck("party"..INSPECT_CURRENT, INSPECT_CURRENT)
 			end
 
 			if ( INSPECT_CURRENT == PARTY_NUM ) then
@@ -319,20 +349,19 @@ function ATT:QuerySpecInfo()
 end
 
 function ATT:SavePositions()
-	for i=1,#anchors do
+	local UIParentScale = UIParent:GetEffectiveScale()
+	local UIParentTop = UIParent:GetTop()
+
+	for i=1,PARTY_NUM do
 		local anchor = anchors[i]
 
-		local scale = anchor:GetEffectiveScale()
-		local worldscale = UIParent:GetEffectiveScale()
-		local x = anchor:GetLeft() * scale
-		local y = (anchor:GetTop() * scale) - (UIParent:GetTop() * worldscale)
-		print(scale, worldscale, x,y)
-
-		if not db.positions[k] then
-			db.positions[k] = {}
+		if ( not db.Position[i] ) then
+			db.Position[i] = {}
 		end
-		db.positions[k].x = x
-		db.positions[k].y = y
+
+		local Scale = anchor:GetEffectiveScale()
+		db.Position[i].X = anchor:GetLeft() * Scale 
+		db.Position[i].Y = (anchor:GetTop() * Scale) - (UIParentTop * UIParentScale)
 	end
 end
 
@@ -353,7 +382,7 @@ function ATT:FindCompactRaidFrameByUnit(Unit)
 
 	local Frame
 
-	for i=1, (__CompactRaidFrame and 40 or PARTY_NUM) do
+	for i=1, (__CRF and 40 or PARTY_NUM) do
 		local Frame
 		local AddOn
 
@@ -384,7 +413,7 @@ function ATT:FindCompactRaidFrameByUnit(Unit)
 
 		-- CUF/Blizz Party
 		if ( not AddOn ) then
-			if ( __CompactRaidFrame )  then
+			if ( __CRF )  then
 				AddOn = _G["CompactRaidFrame"..i]
 			else
 				AddOn = _G["PartyMemberFrame"..i]
@@ -395,43 +424,38 @@ function ATT:FindCompactRaidFrameByUnit(Unit)
 			Frame = AddOn
 		end
 
-		--if ( Frame and not Frame:IsForbidden() ) then -- ERROR: 3.3.5
-			if ( Frame and Frame.unit and UnitGUID(Frame.unit) == UnitIDGUID ) then
+		if ( Frame and not Frame:IsForbidden() ) then
+			if ( Frame.unit and UnitGUID(Frame.unit) == UnitIDGUID ) then
 				return Frame
 			end
-		--end
+		end
 	end
 end
 
 function ATT:LoadPositions()
-	local PartyNum = PARTY_NUM
-
-	db.positions = db.positions or {}
-	
-	if ( PartyNum > 0 ) then
-		for i=1,PartyNum do
+	if ( PARTY_NUM > 0 and ENABLED ) then
+		for i=1, PARTY_NUM do
 			local anchor = anchors[i]
 
 			anchor:ClearAllPoints() -- COMPAT
 
-			local raidFrame
-			if ( db.attach ) then
-				raidFrame = ATT:FindCompactRaidFrameByUnit("party"..i)
+			local frame
+			if ( db.Attach ) then
+				frame = ATT:FindCompactRaidFrameByUnit("party"..i)
 			end
 
-			anchor:ClearAllPoints()
-			if ( raidFrame ) then	
-				if ( db.horizontal ) then 	
-					anchor:SetPoint(db.growLeft and "BOTTOMLEFT" or "BOTTOMRIGHT", raidFrame, db.growLeft and "BOTTOMRIGHT" or "BOTTOMLEFT", db.offsetX, db.offsetY)
+			if ( frame ) then	
+				if ( db.Horiz ) then 	
+					anchor:SetPoint(db.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", frame, db.Left and "BOTTOMRIGHT" or "BOTTOMLEFT", db.OffX, db.OffY)
 				else	
-					anchor:SetPoint(db.growLeft and "BOTTOMLEFT" or "BOTTOMRIGHT", raidFrame, db.growLeft and "TOPLEFT" or "TOPRIGHT", db.offsetX, db.offsetY)
+					anchor:SetPoint(db.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", frame, db.Left and "TOPLEFT" or "TOPRIGHT", db.OffX, db.OffY)
 				end
 			else
-				if ( db.positions[i] ) then	
-					local x = db.positions[i].x	
-					local y = db.positions[i].y	
-					local scale = anchor:GetEffectiveScale()
-					anchor:SetPoint("TOPLEFT", UIParent,"TOPLEFT", x/scale, y/scale)
+				if ( db.Position[i] ) then	
+					local X = db.Position[i].X	
+					local Y = db.Position[i].Y	
+					local Scale = anchor:GetEffectiveScale()
+					anchor:SetPoint("TOPLEFT", UIParent,"TOPLEFT", X/Scale, Y/Scale)
 				else	
 					anchor:SetPoint("CENTER", UIParent, "CENTER")
 				end
@@ -451,8 +475,8 @@ function ATT:CreateAnchors()
 			anchor.icons = {}
 			anchor.spells = {}
 			anchor.HideIcons = function() local icons = anchor.icons for i=1,#icons do local icon = icons[i] icon:Hide() icon.inUse = nil end end
-			anchor:SetScript("OnMouseDown",function(self,button) if button == "LeftButton" and not db.attach then self:StartMoving() end end)
-			anchor:SetScript("OnMouseUp",function(self,button) if button == "LeftButton" and not db.attach then self:StopMovingOrSizing() ATT:SavePositions() end end)
+			anchor:SetScript("OnMouseDown",function(self,button) if button == "LeftButton" and not db.Attach then self:StartMoving() end end)
+			anchor:SetScript("OnMouseUp",function(self,button) if button == "LeftButton" and not db.Attach then self:StopMovingOrSizing() ATT:SavePositions() end end)
 			anchor:Hide()
 			anchors[i] = anchor
 			anchor.i = i
@@ -463,40 +487,39 @@ function ATT:CreateAnchors()
 	end
 end
 
--- creates a new raw frame icon that can be used/reused to show cooldowns
 local function CreateIcon(anchor)
 	local icon = CreateFrame("Frame",anchor:GetName().."Icon".. (#anchor.icons+1),ATTIcons,"ActionButtonTemplate")
 	icon:SetSize(40,40) 	
 	local cd = CreateFrame("Cooldown",icon:GetName().."Cooldown",icon,"CooldownFrameTemplate")
 	icon.cd = cd
 	icon.Start = function(sentCD)
-		icon.cooldown = tonumber(sentCD)
-
-		if icon.cooldown then
+		if ( icon.inUse ) then
 			icon.starttime = GetTime()
-			CooldownFrame_Set(cd, icon.starttime, icon.cooldown, 1)
-			
+			CooldownFrame_Set(cd, icon.starttime, sentCD or icon.cooldown, 1)
+
 			if ( db.Glow ) then
 				if ( not icon.flash ) then
 					icon.flash = CreateFrame("Frame", nil, icon, "TGlowFlash")
 				end
 				icon.flash.D:Play()
 			end
-		end
-		
-		icon:Show()
-		icon.active = true 	
-		activeGUIDS[icon.GUID] = activeGUIDS[icon.GUID] or {}	
-		activeGUIDS[icon.GUID][icon.ability] = activeGUIDS[icon.GUID][icon.ability] or {}	
-		activeGUIDS[icon.GUID][icon.ability].starttime = icon.starttime	
-		activeGUIDS[icon.GUID][icon.ability].cooldown =  icon.cooldown
 
-		if ( icon.cooldown and db.hidden ) then
-			ATT:ToggleIconDisplay(anchor.i)
+			if ( icon.inUse ) then
+				icon:Show()
+				icon.active = true
+			end
+			activeGUIDS[icon.GUID] = activeGUIDS[icon.GUID] or {}
+			activeGUIDS[icon.GUID][icon.ability] = activeGUIDS[icon.GUID][icon.ability] or {}
+			activeGUIDS[icon.GUID][icon.ability].starttime = icon.starttime
+			activeGUIDS[icon.GUID][icon.ability].cooldown =  icon.cooldown
+
+			if ( db.Hidden ) then
+				ATT:ToggleIconDisplay(anchor.i)
+			end
 		end
 	end
 	icon.Stop = function()
-		CooldownFrame_Set(cd,0,0,0)
+		CooldownFrame_Set(cd, 0, 0, 0)
 		icon.starttime = 0
 		activeGUIDS[icon.GUID] = activeGUIDS[icon.GUID] or {}	
 		if activeGUIDS[icon.GUID][icon.ability] then
@@ -523,65 +546,44 @@ local function CreateIcon(anchor)
 
 		HideGlow(icon)
 
-		if ( db.hidden ) then
+		if ( db.Hidden ) then
 			ATT:ToggleIconDisplay(anchor.i)
 		end
 	end)
-		
+
 	ATT:ApplyIconTextureBorder(icon)
 
-	-- tooltip:
+	-- Tooltips
 	icon:EnableMouse()
 	icon:SetScript('OnEnter', function()
-		if db.showTooltip and icon.abilityID then	
-			ATTTooltip:ClearLines()
-			ATTTooltip:SetOwner(WorldFrame, "ANCHOR_CURSOR")
-			ATTTooltip:SetSpellByID(icon.abilityID)
+		if ( db.Tooltip and icon.abilityID ) then
+			GameTooltip:SetOwner(ATT, "ANCHOR_CURSOR")
+			GameTooltip:SetHyperlink("spell:"..icon.abilityID)
 		end
 	end)
 	icon:SetScript('OnLeave', function()
-		if db.showTooltip and icon.abilityID then	
-			ATTTooltip:ClearLines()
-			ATTTooltip:Hide()
+		if ( db.Tooltip and icon.abilityID ) then
+			GameTooltip:Hide()
 		end
 	end)
-	return icon	
+	return icon
 end
 
--- adds a new icon to icon list of anchor
 function ATT:AddIcon(icons,anchor)
 	local newicon = CreateIcon(anchor)
-	iconlist[#iconlist+1] = newicon
 	icons[#icons+1] = newicon
-	
-	newicon.isNeedStart = function(sentCD)
-		cooldown = tonumber(sentCD)
-		activeCooldown = newicon.cooldown
-		endTimeCooldown = newicon.starttime + activeCooldown
-		diff = endTimeCooldown - GetTime()
-		
-		if diff < cooldown then
-			return true
-		end
-		
-		if diff > cooldown then
-			return false
-		end
-	end
-	
+
 	return newicon
 end
 
--- applies texture border to an icon
 function ATT:ApplyIconTextureBorder(icon)
-	if db.showIconBorders then
+	if ( db.Border ) then
 		icon.texture:SetTexCoord(0,1,0,1)
 	else
 		icon.texture:SetTexCoord(0.07,0.9,0.07,0.90)
 	end
 end
-
--- hides anchors currently not in use due to too few party members	
+	
 function ATT:ToggleAnchorDisplay()
 	for i=1, 4 do
 		local anchor = anchors[i]
@@ -590,19 +592,23 @@ function ATT:ToggleAnchorDisplay()
 			local PartyMemberExist = UnitInParty("party"..i)
 
 			if ( not PartyMemberExist ) then
-				local icons = anchor.icons
+				local Icons = anchor.icons
+				local IconsNum = #Icons
 
-				for j=1, #icons do	
-					icons[j].ability = nil	
-					icons[j].seen = nil	
-					icons[j].active = nil	
-					icons[j].inUse = nil	
-					icons[j].showing = nil	
+				if ( IconsNum > 0 ) then
+					for j=1, IconsNum do	
+						Icons[j].ability = nil	
+						Icons[j].seen = nil	
+						Icons[j].active = nil	
+						Icons[j].inUse = nil	
+						Icons[j].showing = nil	
+					end
+
+					anchor.spells = {}
+					anchor:HideIcons()
 				end
 
-				anchor.spells = {}
 				anchor:Hide()
-				anchor:HideIcons()
 			else
 				anchor:Show()
 			end
@@ -610,15 +616,29 @@ function ATT:ToggleAnchorDisplay()
 	end
 end
 
+local function UpdateAnchorAdd(numIcons, anchor, abilityTable)
+	insert(anchor.spells, abilityTable)
+
+	local icon = ATT:UpdateAnchorIcon(anchor, numIcons, abilityTable)
+	activeGUIDS[icon.GUID] = activeGUIDS[icon.GUID] or {}
+	if activeGUIDS[icon.GUID][icon.ability] then
+		icon.SetTimer(activeGUIDS[icon.GUID][icon.ability].starttime,activeGUIDS[icon.GUID][icon.ability].cooldown)
+	else
+		icon.Stop()
+	end
+
+	return numIcons + 1
+end
+
 function ATT:UpdateAnchor(unit, i, PvPTrinket, TraceID, tcooldown)
 	if not self:IsShown() then return end
 
-	local _,class = UnitClass(unit)
+	local _, class = UnitClass(unit)
 	local guid = UnitGUID(unit)
 
-	if not class or not guid then return end -- REMOVE?
+	if not class or not guid then return end
 
-	local _,race = UnitRace(unit)
+	local _, race = UnitRace(unit)
 
 	local anchor = anchors[i]	
 	anchor.GUID = guid	
@@ -627,8 +647,8 @@ function ATT:UpdateAnchor(unit, i, PvPTrinket, TraceID, tcooldown)
 	local icons = anchor.icons
 	local numIcons = 1
 
-	-- PvP Trinket:
-	if db.showTrinket  then 
+	-- PvP Trinket
+	if ( db.Trinket ) then 
 		local ability, id, cooldown = PvPTrinket.ability, PvPTrinket.id, PvPTrinket.cooldown
 		local icon = icons[numIcons] or self:AddIcon(icons,anchor)
 		icon.texture:SetTexture(TraceID)
@@ -639,78 +659,75 @@ function ATT:UpdateAnchor(unit, i, PvPTrinket, TraceID, tcooldown)
 		icon.inUse = true
 		icon.spec = nil
 		ATT:ApplyIconTextureBorder(icon)
-		
+
 		activeGUIDS[icon.GUID] = activeGUIDS[icon.GUID] or {}
 		if activeGUIDS[icon.GUID][icon.ability] then
 			icon.SetTimer(activeGUIDS[icon.GUID][ability].starttime,activeGUIDS[icon.GUID][ability].cooldown)
 		else
 			icon.Stop()
 		end
-		numIcons = numIcons + 1 
-	elseif icons[1] and icons[1].ability == PvPTrinketName then
+		numIcons = numIcons + 1
+	elseif icons[1] and (icons[1].ability == dbTrinket[1].ability or icons[1].ability == dbTrinket[2].ability) then
 		icons[1]:Hide()
 		icons[1].showing = nil
 		icons[1].inUse = nil
 		icons[1].spec = nil
-		table.remove(icons, 1) 
+		remove(icons, 1) 
 	end 
 
 	-- Racials
-	if db.showRacial then
-		for abilityIndex, abilityTable in pairs(dbRacial) do
-			local abilityCheck, id, cooldown, talent, race = abilityTable.ability, abilityTable.id, abilityTable.cooldown, abilityTable.talent, abilityTable.race
-			
-			ability = nil  
-			_, raceID = UnitRace(unit)
-			if raceID == race then
-				ability = GetSpellInfo(abilityCheck)
-				id = abilityCheck 
+	if ( db.Racial ) then
+		local Racial = dbRacial[race]
+
+		if ( Racial ) then
+			local RacialID = Racial[1]
+			local RacialCD = Racial[2]
+			local RacialName = GetSpellInfo(RacialID)
+
+			local Icon = icons[numIcons] or self:AddIcon(icons, anchor)
+			local texture = self:FindAbilityIcon(RacialName, RacialID)
+			Icon.texture:SetTexture(texture)
+
+			Icon.GUID = anchor.GUID
+			Icon.ability = RacialName
+			Icon.abilityID = RacialID
+			Icon.cooldown = RacialCD
+			Icon.inUse = true
+			ATT:ApplyIconTextureBorder(Icon)
+
+			activeGUIDS[Icon.GUID] = activeGUIDS[Icon.GUID] or {}
+			if ( activeGUIDS[Icon.GUID][Icon.ability] ) then
+				local ActiveGUID = activeGUIDS[Icon.GUID][RacialName]
+				Icon.SetTimer(ActiveGUID.starttime, ActiveGUID.cooldown)
+			else
+				Icon.Stop()
 			end
-			
-			if id and ability then	
-				local icon = icons[numIcons] or self:AddIcon(icons,anchor)   
-				local texture = self:FindAbilityIcon(ability, id)
-				if texture then
-					icon.texture:SetTexture(texture)
-				end
-				icon.GUID = anchor.GUID
-				icon.ability = ability
-				icon.abilityID = id
-				icon.cooldown = cooldown
-				icon.inUse = true
-				icon.spec = talent
-				icon.spellStatus = spellStatus
-				ATT:ApplyIconTextureBorder(icon)
-			 
-				activeGUIDS[icon.GUID] = activeGUIDS[icon.GUID] or {}
-				if activeGUIDS[icon.GUID][icon.ability]  then
-					icon.SetTimer(activeGUIDS[icon.GUID][ability].starttime,activeGUIDS[icon.GUID][ability].cooldown)
-				else
-					icon.Stop()
-				end
-				numIcons = numIcons + 1
-			end
-		end 
+
+			numIcons = numIcons + 1
+		end
 	end
-	
-	local specSpells = dbSpecAbilities[anchor.class]
-	for specID, abilitiesTable in pairs(db.abilities[class]) do
-		for abilityIndex, abilityTable in pairs(abilitiesTable) do
-			if abilityTable.spellStatus ~= "DISABLED" and not specSpells[abilityTable.ability] or (anchor.spec and anchor.spec[abilityTable.ability]) then
-				table.insert(anchor.spells, abilityTable)
-				local icon = self:UpdateAnchorIcon(anchor, numIcons, abilityTable)
-				activeGUIDS[icon.GUID] = activeGUIDS[icon.GUID] or {}
-				if activeGUIDS[icon.GUID][icon.ability] then
-					icon.SetTimer(activeGUIDS[icon.GUID][icon.ability].starttime,activeGUIDS[icon.GUID][icon.ability].cooldown)
-				else
-					icon.Stop()
+
+	-- All Spells
+	for abilityIndex, abilityTable in pairs(db.Spells[class]["*"]) do
+		if ( abilityTable.spellStatus ~= false ) then
+			numIcons = UpdateAnchorAdd(numIcons, anchor, abilityTable)
+		end
+	end
+
+	-- Spec Spells
+	if ( anchor.spec ) then
+		for specID, abilitiesTable in pairs(db.Spells[class]) do
+			if ( specID ~= "*" ) then
+				for abilityIndex, abilityTable in pairs(abilitiesTable) do
+					if ( abilityTable.spellStatus ~= false and anchor.spec[abilityTable.ability] ) then
+						numIcons = UpdateAnchorAdd(numIcons, anchor, abilityTable)
+					end
 				end
-				numIcons = numIcons + 1
 			end
 		end
 	end
 
-	-- clean leftover icons
+	-- Icon Overflow
 	for j=numIcons,#icons do
 		icons[j].seen = nil
 		icons[j].active = nil
@@ -722,7 +739,7 @@ end
 
 function ATT:UpdateAnchorIcon(anchor, numIcons, abilityTable)
 	local icons = anchor.icons
-	local ability, id, cooldown, talent, spellStatus = abilityTable.ability, abilityTable.id, abilityTable.cooldown, abilityTable.talent, abilityTable.spellStatus
+	local ability, id, cooldown, spellStatus = abilityTable.ability, abilityTable.id, abilityTable.cooldown, abilityTable.spellStatus
 	local icon = icons[numIcons] or self:AddIcon(icons,anchor)
 	local texture = self:FindAbilityIcon(ability, id)
 	if texture then
@@ -734,7 +751,6 @@ function ATT:UpdateAnchorIcon(anchor, numIcons, abilityTable)
 	icon.cooldown = cooldown
 	icon.shouldShow = true
 	icon.inUse = true
-	icon.spec = talent
 	icon.spellStatus = spellStatus
 
 	ATT:ApplyIconTextureBorder(icon)
@@ -753,27 +769,27 @@ function ATT:ToggleIconDisplay(i)
 	for k, icon in pairs(icons) do
 		if icon and icon.ability and icon.inUse then	
 			if icon.spec then	
-				icon.showing = (not db.hidden and icon.seen) or (db.hidden and activeGUIDS[icon.GUID][icon.ability] and icon.active)
+				icon.showing = (not db.Hidden and icon.seen) or (db.Hidden and activeGUIDS[icon.GUID][icon.ability] and icon.active)
 			else	
-				icon.showing = (activeGUIDS[icon.GUID] and activeGUIDS[icon.GUID][icon.ability] and icon.active) or (not db.hidden)
+				icon.showing = (activeGUIDS[icon.GUID] and activeGUIDS[icon.GUID][icon.ability] and icon.active) or (not db.Hidden)
 			end
 		end
 		icon:ClearAllPoints()
 
 		if icon and icon.ability and icon.showing then	
-			if db.tworows then	
+			if db.Rows then
 				if count == 1 then 	
-					icon:SetPoint(db.growLeft and "TOPRIGHT" or "TOPLEFT", anchor, db.growLeft and "BOTTOMLEFT" or "BOTTOMRIGHT", db.growLeft and -1 * db.OffsetX or db.OffsetX, 0)
+					icon:SetPoint(db.Left and "TOPRIGHT" or "TOPLEFT", anchor, db.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", db.Left and -1 * db.SpaceX or db.SpaceX, 0)
 				elseif  (count % 2 == 0 )  then				
-					icon:SetPoint(db.growLeft and "TOP" or "TOP", icons[lastActiveIndex], db.growLeft and "BOTTOM" or "BOTTOM", db.growLeft and 0 or 0, -1 * db.OffsetY )			
+					icon:SetPoint(db.Left and "TOP" or "TOP", icons[lastActiveIndex], db.Left and "BOTTOM" or "BOTTOM", db.Left and 0 or 0, -1 * db.SpaceY )			
 				else		
-					icon:SetPoint(db.growLeft and "BOTTOMRIGHT" or "BOTTOMLEFT", icons[lastActiveIndex], db.growLeft and "TOPLEFT" or "TOPRIGHT", db.growLeft and -1 * db.OffsetX  or db.OffsetX, db.OffsetY)
+					icon:SetPoint(db.Left and "BOTTOMRIGHT" or "BOTTOMLEFT", icons[lastActiveIndex], db.Left and "TOPLEFT" or "TOPRIGHT", db.Left and -1 * db.SpaceX  or db.SpaceX, db.SpaceY)
 				end	
 			else
 				if count == 1  then	
-					icon:SetPoint(db.growLeft and "TOPRIGHT" or "TOPLEFT", anchor, db.growLeft and "BOTTOMLEFT" or "BOTTOMRIGHT", db.growLeft and -1 * db.OffsetX or db.OffsetX, 0)
+					icon:SetPoint(db.Left and "TOPRIGHT" or "TOPLEFT", anchor, db.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", db.Left and -1 * db.SpaceX or db.SpaceX, 0)
 				else	
-					icon:SetPoint(db.growLeft and "RIGHT" or "LEFT", icons[lastActiveIndex], db.growLeft and "LEFT" or "RIGHT", db.growLeft and -1 * db.OffsetX or db.OffsetX, 0)
+					icon:SetPoint(db.Left and "RIGHT" or "LEFT", icons[lastActiveIndex], db.Left and "LEFT" or "RIGHT", db.Left and -1 * db.SpaceX or db.SpaceX, 0)
 				end
 			end
 
@@ -784,34 +800,30 @@ function ATT:ToggleIconDisplay(i)
 			icon:Hide()
 		end
 	end
-	
+
 	self:ToggleAnchorDisplay() 	
 end
 
--- Checking PVP trinket
-
 function ATT:TrinketCheck(Unit, i)
-	local Trinket = dbTrinket[1] -- Fetch trinket data, or could do FindAbilityByID, saving calls.
-	local Name
+	local Trinket = dbTrinket[1]
 	local Icon
 
 	if ( PLAYER_FACTION == "Alliance" ) then
-		if ( UnitRace(Unit) == "Human" ) then
-			Name = TRINKET_HUMAN
+		local _, Race = UnitRace(Unit)
+		if ( Race == "Human" ) then
+			Trinket = dbTrinket[2]
 		end
 
-		Icon = GetItemIcon(18854)
+		Icon = TRINKET_ALLIANCE
 	else
-		Icon = GetItemIcon(18849)
+		Icon = TRINKET_HORDE
 	end
-
-	Trinket.ability = Name or "PvP Trinket"
 
 	self:UpdateAnchor(Unit, i, Trinket, Icon)  
 end
 
 function ATT:UpdateAllAnchors()
-	if ( PARTY_NUM > 0 ) then
+	if ( PARTY_NUM > 0 and ENABLED ) then
 		for i=1, PARTY_NUM do
 			local Unit = "party"..i
 			local _, Class = UnitClass(Unit)
@@ -824,20 +836,18 @@ function ATT:UpdateAllAnchors()
 	end
 
 	self:LoadPositions()
-	self:ToggleAnchorDisplay()
-	--self:ApplySettings()
 end
 
 function ATT:UpdateAllAnchorIcons()
-	if ( PARTY_NUM > 0 ) then
-		for i=1, PARTY_NUM do -- GetNumPartyMembers or 4
+	if ( PARTY_NUM > 0 and ENABLED ) then
+		for i=1, PARTY_NUM do
 			ATT:ToggleIconDisplay(i)
 		end
 	end
 end
 
 local function GROUP_ROSTER_UPDATE_DELAY()
-	ATT:UpdateAllAnchors() -- This is better on classic, but on 3.3.5 inside ROSTER_UPDATE
+	ATT:UpdateAllAnchors()
 	QUERY_SPEC_START()
 	GROUP_ROSTER_UPDATE_DELAY_QUEUED = nil
 end
@@ -857,10 +867,10 @@ function ATT:GROUP_ROSTER_UPDATE(Load)
 		self:ApplySettings()
 	end
 
-	if ( ValidZoneType() ) then
+	if ( ENABLED and ValidZoneType() ) then
 		-- Our party has changed size, lets re-check spec.
 		-- 3.3.5: This fires when we leave group, idk how to avoid.
-		if ( PARTY_NUM > 0 and (PartyChanged or CURRENT_ZONE_TYPE == "arena") ) then -- Dynamic updating.
+		if ( PARTY_NUM > 0 and (PartyChanged or CURRENT_ZONE_TYPE ~= PREVIOUS_ZONE_TYPE) ) then -- Dynamic updating.
 			for i=1, PARTY_NUM do
 				local anchor = anchors[i]
 
@@ -887,7 +897,7 @@ function ATT:PARTY_MEMBERS_CHANGED()
 end
 
 function ATT:PLAYER_ENTERING_WORLD()
-	-- Update the player faction, cause merc on Warmane.
+	-- Player faction, cause merc on Warmane.
 	PLAYER_FACTION = UnitFactionGroup("player")
 
 	local _
@@ -895,8 +905,8 @@ function ATT:PLAYER_ENTERING_WORLD()
 	_, CURRENT_ZONE_TYPE = IsInInstance()
 
 	-- Check if we have the CRF addon.
-	if ( __CompactRaidFrame == false ) then
-		__CompactRaidFrame = CompactRaidFrameContainer or CompactRaidFrameDB
+	if ( __CRF == false ) then
+		__CRF = CompactRaidFrameContainer or CompactRaidFrameDB
 	end
 
 	-- Zone changed, or init load.
@@ -945,24 +955,24 @@ local function AnimateTexCoords_OnUpdate(Self, Elapsed)
 	AnimateTexCoords(Self.A, 256, 256, 48, 48, 22, Elapsed, 0.03)
 end
 
-function ATT:HandleGlow(SpellID, Event, Anchor)
+function ATT:HandleGlow(SpellName, Event, Anchor)
 	for i=1,#Anchor.icons do
-		local icon = Anchor.icons[i]
+		local Icon = Anchor.icons[i]
 
-		if ( icon.abilityID == SpellID ) then
-			-- Need to check if the animation is already active, then do nothing.
+		if ( Icon.ability == SpellName ) then
 			if ( Event == "SPELL_AURA_APPLIED" ) then
-				if ( not icon.glow ) then
-					icon.glow = CreateFrame("Frame", nil, icon, "TGlow")
+				if ( not Icon.glow ) then
+					Icon.glow = CreateFrame("Frame", nil, Icon, "TGlow")
 				end
-				icon.cd:SetAlpha(0)
-				icon.glow:SetScript("OnUpdate", AnimateTexCoords_OnUpdate)
-				icon.glow:Show()
-			else
-				HideGlow(icon)
 
-				if ( icon.flash ) then
-					icon.flash.D:Play()
+				Icon.cd:SetAlpha(0)
+				Icon.glow:SetScript("OnUpdate", AnimateTexCoords_OnUpdate)
+				Icon.glow:Show()
+			else
+				HideGlow(Icon)
+
+				if ( Icon.flash ) then
+					Icon.flash.D:Play()
 				end
 			end
 
@@ -971,54 +981,42 @@ function ATT:HandleGlow(SpellID, Event, Anchor)
 	end
 end
 
-function ATT:StartCooldown(SpellID, Anchor)
-	-- Check and find spell in DBS
-	local cAbility = self:FindAbilityByID(Anchor.spells, SpellID) or self:FindAbilityByID(dbRacial, SpellID) or self:FindAbilityByID(dbTrinket, SpellID)
-	local spellName = select(1,GetSpellInfo(SpellID))
-	
-	-- Add it to our "tracked cds"
-	self:TrackCooldown(Anchor, spellName, cAbility and cAbility.cooldown or nil) 
-end
+function ATT:StartCooldown(SpellName, Anchor)
+	for i=1,#Anchor.icons do
+		local Icon = Anchor.icons[i]
 
-function ATT:TrackCooldown(anchor, ability, cooldown)
-	for k,icon in ipairs(anchor.icons) do
-		if cooldown then 
-			-- Direct cooldown
-			if icon.ability == ability then 
-				icon.seen = true
-				icon.Start(cooldown)
-				
-				-- Overall Cooldown
-				if overallCooldowns[anchor.race] and overallCooldowns[anchor.race][ability] then
-					for k,overallCooldown in pairs(overallCooldowns[anchor.race]) do
-						if k ~= icon.ability then
-							for index,overallIcon in ipairs(anchor.icons) do
-								if overallIcon.ability == k and overallIcon.isNeedStart(overallCooldown) then
-									overallIcon.Start(overallCooldown)
-									break
-								end
-							end
-							break
-						end
+		if ( Icon.ability == SpellName ) then
+			Icon.seen = true
+			Icon.Start()
+		else
+			-- Undead Racial <-> PvP Trinket (45s)
+			if ( Anchor.race == "Scourge" ) then
+				local Trinket = dbTrinket[1].ability
+				if ( (Icon.ability == RACIAL_UNDEAD and SpellName == Trinket) or (Icon.ability == Trinket and SpellName == RACIAL_UNDEAD) ) then
+					if ( not Icon.active ) then
+						Icon.Start(45)
 					end
 				end
-				
-			end	
-		end
-
-		-- Grouped Cooldowns
-		if groupedCooldowns[anchor.class] and groupedCooldowns[anchor.class][ability] then
-			for k in pairs(groupedCooldowns[anchor.class]) do
-				if k == icon.ability and icon.shouldShow then icon.Start(cooldown) break end
 			end
-		end
 
-		-- Cooldown resetters
-		if cooldownResetters[ability] then
-			if type(cooldownResetters[ability]) == "table" then
-				if cooldownResetters[ability][icon.ability] then icon.Stop() end
-			else
-				icon.Stop()
+			-- Grouped CD
+			local GroupedClassSpells = groupedCooldowns[Anchor.class]
+			if ( GroupedClassSpells ) then
+				local GroupedSpellType = GroupedClassSpells[SpellName]
+
+				if ( GroupedSpellType ) then
+					if ( GroupedSpellType == GroupedClassSpells[Icon.ability] ) then
+						Icon.Start()
+					end
+				end
+			end
+
+			-- Reset CD
+			local Reset = cooldownResetters[SpellName]
+			if ( Reset ) then
+				if ( Reset[Icon.ability] ) then
+					Icon.Stop()
+				end
 			end
 		end
 	end
@@ -1038,11 +1036,15 @@ function ATT:COMBAT_LOG_EVENT_UNFILTERED(...)
 				local Anchor = anchors[SourceID]
 
 				-- Classic: Buff is fired BEFORE cast event. Makes no sense, I know.
-				if ( CastEvent or (Event == "SPELL_AURA_APPLIED" and SpellName == "Hex") ) then
-					self:StartCooldown(SpellID, Anchor)
+				-- Whitelist: Hex
+				if ( CastEvent or (Event == "SPELL_AURA_APPLIED" and SpellName == HEX) ) then
+					self:StartCooldown(SpellName, Anchor)
 				elseif ( SpellType == "BUFF" ) then
 					if ( DestGUID == SourceGUID and db.Glow ) then
-						self:HandleGlow(SpellID, Event, Anchor)
+						-- Blacklist: Berserk (Enchant), PvP Trinket
+						if ( SpellID ~= 59620 and SpellID ~= 59752 ) then
+							self:HandleGlow(SpellName, Event, Anchor)
+						end
 					end
 				end
 			end
@@ -1051,52 +1053,85 @@ function ATT:COMBAT_LOG_EVENT_UNFILTERED(...)
 end
 
 function ATT:ApplySettings()
-	if ValidZoneType() and PARTY_NUM > 0 then
+	if ( ValidZoneType() and PARTY_NUM > 0 ) then
 		if ( not ENABLED ) then
 			ATTIcons:Show()
 			self:Show()
 			self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 			ENABLED = 1
+
+			if ( not db.Lock ) then
+				ATTAnchor:Show()
+			end
 		end
 	elseif ( ENABLED ) then
+		if ( PARTY_NUM == 0 ) then
+			self:StopAllIcons()
+		end
+
 		ATTIcons:Hide()
 		self:Hide()
 		self:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 		QUERY_SPEC_STOP()
 		ENABLED = nil
+
+		ATTAnchor:Hide()
 	end
 end
 
--- resets all icons on zone change
 function ATT:StopAllIcons()
-	for k=1,#iconlist do
-		local v = iconlist[k]
-		v.Stop()
-		v.seen = nil
+	local Anchors = #anchors
+	for i=1, Anchors do
+		local Icons = anchors[i].icons
+
+		for k=1, #Icons do
+			local Icon = Icons[k]
+			Icon.Stop()
+			Icon.seen = nil
+		end
 	end
+
 	wipe(activeGUIDS)
 end
 
 local function ATT_OnLoad(self)
 	self:RegisterEvent("PLAYER_ENTERING_WORLD")
 	self:RegisterEvent(GROUP_ROSTER_UPDATE)
-	self:SetScript("OnEvent",function(self,event, ...) if self[event] then self[event](self, ...) end end)
+	self:SetScript("OnEvent", function(self,event, ...) if self[event] then self[event](self, ...) end end)
 
-	ATTDB = ATTDB
-	if (ATTDB and ( (ATTDB.V and V > ATTDB.V) or not ATTDB.V) ) or not ATTDB then
-		print("ATT Loaded!")
+	groupedCooldowns = ConvertSpells(groupedCooldowns)
+	cooldownResetters = ConvertReset(cooldownResetters)
+	ConvertTrinket()
 
-		-- Cache the default abilities, they won't be the same if user edits them.
-		ATTDB = { abilities = ATTdefaultAbilities, Scale = 1, OffsetY = 2 , OffsetX = 5 , Glow = 1, V = V, showIconBorders = true }
+	if (TPTDB and ( (TPTDB.V and V > TPTDB.V) or not TPTDB.V) ) or not TPTDB then
+		print("|cffFF4500/tpt")
+		TPTDB = { Spells = PrepareDefaultSpells(), Position = {}, Scale = 1, OffY = 2, OffX = 5, SpaceX = 0, SpaceY = 0, Glow = 1, V = V, Border = true, World = true, Arena = true, Trinket = true, Racial = true }
 	end
-	db = ATTDB
-	db.classSelected = "WARRIOR"
+	db = TPTDB
+
+	ATTdefault.defaultAbilities = nil
+
+	FERAL_CHARGE = GetSpellInfo(49377)
+	FERAL_CHARGE_BEAR = GetSpellInfo(16979)
+	FERAL_CHARGE_CAT = GetSpellInfo(49376)
+	HEX = GetSpellInfo(51514)
+	RACIAL_UNDEAD = GetSpellInfo(7744)
+	TRINKET_ALLIANCE = GetItemIcon(18854)
+	TRINKET_HORDE = GetItemIcon(18849)
 
 	self:CreateAnchors()
-	self:CreateOptions()
-	self:UpdateScrollBar()
+
+	-- Init Options
+	local _, AddonTitle = GetAddOnInfo(addon)
+	local SO = LibStub("LibSimpleOptions-1.0")
+	SO.AddOptionsPanel(AddonTitle, self.BuildOptions)
+	SO.AddSlashCommand(AddonTitle, "/tpt")
+
 	Lock()
 	ATTIcons:SetScale(db.Scale or 1)
+	ATTIcons:Hide()
+	ATTAnchor:Hide()
+	ATT:Hide()
 end
 
 function ATT:FindAbilityIcon(ability, id)
@@ -1110,7 +1145,7 @@ function ATT:FindAbilityIcon(ability, id)
 end
 
 function ATT:FindAbilityID(ability)
-	for _,S in pairs(SPELLDB) do
+	for _,S in pairs(ATTdefault) do
 		for _,v in pairs(S) do
 			for _,sp in pairs(v) do
 				for _,SPELLID in pairs(sp) do
@@ -1124,32 +1159,36 @@ function ATT:FindAbilityID(ability)
 	end
 end
 
-local function ZoneSet()
-	QUERY_SPEC_STOP()
-	ATT:UpdateAllAnchors()
-	ATT:ApplySettings()
-	QUERY_SPEC_START()
-end
-
 -------------------------------------------------------------
 -- Panel
 -------------------------------------------------------------
 
-local SO = LibStub("LibSimpleOptions-1.01")
+local function ListButtonOnClick(self)
+	self:GetParent().currentButton = self.index
+	ATT:UpdateScrollBar()
+end
 
-local function CreateListButton(parent,index)
-	local button = CreateFrame("Button",parent:GetName()..index,parent)
-		button:SetWidth(190)
+local function CreateListButton(parent, index)
+	local name = parent:GetName()..index
+
+	local button = CreateFrame("Button", name, parent)
+		button:SetWidth(130)
 		button:SetHeight(25)
 
-	local font = CreateFont("ATTListFont")
-		font:SetFont(GameFontNormal:GetFont(),12)
-		font:SetJustifyH("LEFT")
+		button:SetNormalFontObject("GameFontNormalSmallLeft")
 
-	button:SetNormalFontObject(font)
-	button:SetHighlightTexture("Interface\\ContainerFrame\\UI-Icon-QuestBorder")
-	button:GetHighlightTexture():SetTexCoord(0.11,0.88,0.02,0.97)
-	button:SetScript("OnClick",function(self) parent.currentButton = self:GetText() ATT:UpdateScrollBar() end)
+		button:SetNormalTexture("Interface\\QuestFrame\\UI-QuestLogTitleHighlight")
+		local NormalTex = button:GetNormalTexture()
+		NormalTex:SetVertexColor(1, 0.8, 0, 0.7)
+		NormalTex:SetTexCoord(0.11, 0.88, 0.02, 0.97)
+		NormalTex:SetDrawLayer("BACKGROUND", 1)
+
+		button:SetHighlightTexture("Interface\\ContainerFrame\\UI-Icon-QuestBorder")
+		button:GetHighlightTexture():SetTexCoord(0.11, 0.88, 0.02, 0.97)
+
+		button:SetScript("OnClick", ListButtonOnClick)
+
+		button.index = index
 
 	return button
 end
@@ -1162,458 +1201,635 @@ local function CreateEditBox(name,parent,width,height)
 
 	local label = editbox:CreateFontString(nil, "BACKGROUND", "GameFontNormal")
 		label:SetText(name)
-		label:SetPoint("BOTTOMLEFT", editbox, "TOPLEFT",-3,0)
+		label:SetPoint("BOTTOMLEFT", editbox, "TOPLEFT", -3, 0)
 
 	return editbox
 end
 
-function ATT:CreateOptions()
-	local panel = SO.AddOptionsPanel("Arena Team Tracker", function() end)
-	self.panel = panel	
+local function CreateOptionBG(parent, width, height, file, alpha)
+	local texture = parent:CreateTexture()
+	texture:SetTexture(file or "Interface\\Tooltips\\UI-Tooltip-Background")
+	texture:SetSize(width, height)
+	texture:SetAlpha(alpha or 0.2)
 
-	SO.AddSlashCommand("Arena Team Tracker", "/att")
+	return texture
+end
 
-	local scale = panel:MakeSlider(	
-		'name', 'Scale',	
-		'description', 'Adjust the scale of icons',	
-		'minText', '0.1',	
-		'maxText', '5',	
-		'minValue', 0.1,	
-		'maxValue', 5,	
-		'step', 0.05,	
-		'default', 1,	
-		'current', db.Scale,	
-		'setFunc', function(value) db.Scale = value ATTIcons:SetScale(db.Scale) end,	
-		'currentTextFunc', function(value) return string.format("%.2f",value) end)
-	scale:SetPoint("TOPLEFT",panel,"TOPLEFT",15,-30)
-	
-	local offsetX = CreateEditBox("Offset X", panel, 50, 25)
-		offsetX:SetText(db.offsetX or "0")
-		offsetX:SetCursorPosition(0)
-		offsetX:SetPoint("LEFT", scale, "RIGHT", 18, 0)
-		offsetX:SetScript("OnEnterPressed", function(self)
-			self:ClearFocus()
-			local num = self:GetText():match("%-?%d+$")
-			if num then	
-				print("Offset X changed and saved: " .. tostring(num))
-				db.offsetX = num	
-				ATT:LoadPositions()
-			else	
-				print("Wrong value for Offset X/Y")
-				self:SetText(db.offsetX)
-			end
-		end)
-		panel.offsetX = offsetX
-	
-	local offsetY = CreateEditBox("Offset Y", panel, 50, 25)
-		offsetY:SetText(db.offsetY or "0")
-		offsetY:SetCursorPosition(0)
-		offsetY:SetPoint("LEFT", offsetX, "RIGHT", 8, 0)
-		offsetY:SetScript("OnEnterPressed", function(self)
-			self:ClearFocus()
-			local num = self:GetText():match("%-?%d+$")
-			if num then	
-				print("Offset Y changed and saved: " .. tostring(num))
-				db.offsetY = num	
-				ATT:LoadPositions()
-			else	
-				print("Wrong value for Offset X/Y")
-				self:SetText(db.offsetY)
-			end
-		end)
-		panel.offsetY = offsetY	
-	
-	local OffsetX = CreateEditBox("Icon X", panel, 50, 25)
-		OffsetX:SetText(db.OffsetX or 5)
-		OffsetX:SetCursorPosition(0)
-		OffsetX:SetPoint("LEFT", offsetY, "RIGHT", 8, 0)
-		OffsetX:SetScript("OnEnterPressed", function(self)
-			self:ClearFocus()
-			local num = self:GetText():match("%-?%d+$")
-			if num then	
-				print("Icon Offset X changed and saved: " .. tostring(num))
-				db.OffsetX = num	
-				ATT:LoadPositions()
-			else	
-				print("Wrong value for Icon Offset X")
-				self:SetText(db.OffsetX)
-			end
-		end)
-		panel.OffsetX = OffsetX	
+local function ZoneSet(setting, value)
+	db[setting] = value
 
-	local OffsetY = CreateEditBox("Icon Y", panel, 50, 25)
-		OffsetY:SetText(db.OffsetY or 2)
-		OffsetY:SetCursorPosition(0)
-		OffsetY:SetPoint("LEFT", OffsetX, "RIGHT", 8, 0)
-		if not db.OffsetY then local OffsetY = 2 end
-		OffsetY:SetScript("OnEnterPressed", function(self)
-			self:ClearFocus()
-			local num = self:GetText():match("%-?%d+$")
-			if db.OffsetY == nil then db.OffsetY = "2" end
-			if num then	
-				print("Icon Offset Y changed and saved: " .. tostring(num))
-				db.OffsetY = num	
-				ATT:LoadPositions()
-			else	
-				print("Wrong value for Icon Offset Y")
-				self:SetText(db.OffsetY)
-			end
-		end)
-		panel.OffsetY = OffsetY
+	QUERY_SPEC_STOP()
+	ATT:ApplySettings()
+	if ( ENABLED ) then
+		ATT:UpdateAllAnchors()
+		QUERY_SPEC_START()
+	end
+end
 
+local function SettingsPrint(title, msg)
+	print(title, ": |cffFF4500", msg)
+end
+
+local function SortAbilities(a, b)
+	if ((a.order or 1) == (b.order or 1)) then
+		return (a.id) < (b.id)
+	end
+
+	return (a.order or 1) < (b.order or 1)
+end
+
+local function GetSelectedSpecs()
+	local ClassSpecs = ATTdefault.dbSpecs[db.SelClass]
+	local Specs = {"*", "All"}
+
+	for SpecName, _ in pairs(ClassSpecs) do
+		insert(Specs, SpecName)
+		insert(Specs, SpecName)
+	end
+
+	return Specs
+end
+
+local function GetLocalClassList()
+	local ClassList = {}
+
+	for ClassID, ClassName in pairs(LOCALIZED_CLASS_NAMES_MALE) do
+		insert(ClassList, ClassID)
+		insert(ClassList, ClassName)
+	end
+
+	return ClassList
+end
+
+local function AttachToggle(panel)
+	if ( db.Attach ) then
+		panel.offsetX:SetAlpha(1)
+		panel.offsetY:SetAlpha(1)
+		panel.horiz:SetAlpha(1)
+		panel.offsetX:Enable()
+		panel.offsetY:Enable()
+		panel.horiz:Enable()
+
+		panel.lock:SetChecked(1)
+		panel.lock:SetAlpha(0.5)
+		panel.lock:Disable()
+		db.Lock = 1
+	else
+		panel.offsetX:SetAlpha(0.5)
+		panel.offsetY:SetAlpha(0.5)
+		panel.horiz:SetAlpha(0.5)
+		panel.offsetX:Disable()
+		panel.offsetY:Disable()
+		panel.horiz:Disable()
+
+		if ( db.Lock == 1 ) then
+			panel.lock:SetChecked(0)
+			panel.lock:SetAlpha(1)
+			panel.lock:Enable()
+			db.Lock = nil
+		end
+	end
+
+	Lock()
+end
+
+local function RowToggle(panel)
+	if ( db.Rows ) then
+		panel.spacingY:SetAlpha(1)
+		panel.spacingY:Enable()
+	else
+		panel.spacingY:SetAlpha(0.5)
+		panel.spacingY:Disable()
+	end
+end
+
+local function NULL() end
+
+function ATT:BuildOptions()
+	local panel = self
+	local self = ATT
+	self.panel = panel
+
+	local CheckOffsetX = 50
+	local SliderWidth = 75
+
+	-- Title
+	panel:MakeTitleTextAndSubText(panel.name)
+
+--[[
+
+BORDER/BG
+
+]]
+
+	-- Display
+	local bg = CreateOptionBG(panel, 403, 65)
+	bg:SetPoint("TOPLEFT", panel, "TOPLEFT", 5, -40)
+
+	-- Offset
+	local bg = CreateOptionBG(panel, 403, 45)
+	bg:SetPoint("TOPLEFT", panel, "TOPLEFT", 5, -120)
+
+	-- Zone
+	local bg = CreateOptionBG(panel, 403, 25)
+	bg:SetPoint("TOPLEFT", panel, "TOPLEFT", 5, -180)
+
+	-- Ability
+	local bg = CreateOptionBG(panel, 230, 20, "Interface\\BUTTONS\\UI-Listbox-Highlight")
+	bg:SetPoint("TOPLEFT", panel, "TOPLEFT", 150, -258)
+
+	local bg = CreateOptionBG(panel, 403, 170, "Interface\\BUTTONS\\UI-Listbox-Highlight")
+	bg:SetPoint("TOPLEFT", panel, "TOPLEFT", 5, -252)
+
+	local abilitylabel = panel:CreateFontString(nil, "BACKGROUND", "GameFontNormalLarge")
+		abilitylabel:SetText("Abilities")
+		abilitylabel:SetPoint("TOPLEFT", bg, "TOPLEFT", 40, 25)
+
+		local abilityicon = CreateOptionBG(panel, 25, 25, "Interface\\ICONS\\inv_misc_book_09", 1)
+		abilityicon:SetPoint("TOPLEFT", panel, "TOPLEFT", 15, -221)
+
+--[[
+
+ALIGN
+
+]]
+
+	-- Attach
 	local attach = panel:MakeToggle(
-		'name', 'Attach to frames',	
-		'description', 'Attach to Blizzard raid frames',	
-		'default', false,	
-		'getFunc', function() return db.attach end,	
-		'setFunc', function(value) db.attach = value ATT:LoadPositions() end)
-	attach:SetPoint("TOPLEFT",scale,"TOPLEFT",-5,-35)
-	
-	local lock = panel:MakeToggle(	
-		'name', 'Lock',	
-		'description', 'Hide/Show anchors',	
-		'default', false,	
-		'getFunc', function() return db.lock end,	
-		'setFunc', function(value) db.lock = value Lock() end)
-	lock:SetPoint("LEFT",attach,"RIGHT",105,0)
-	
-	local hidden = panel:MakeToggle(	
-		'name', 'Hidden',	
-		'description', 'Show icons only when\nthey are on cooldown',	
-		'default', false,	
-		'getFunc', function() return db.hidden end,	
-		'setFunc', function(value) db.hidden = value ATT:UpdateAllAnchors() end)
-	hidden:SetPoint("LEFT",lock,"RIGHT",32,0)
-	
-	local glow = panel:MakeToggle(	
-		'name', 'Glow Icons',	
-		'description', 'Glow icons blizzard style\nwhen ability is active',	
-		'default', true,	
-		'getFunc', function() return db.Glow end,	
-		'setFunc', function(value) db.Glow = value ATT:UpdateAllAnchors()end)
-	glow:SetPoint("LEFT",hidden,"RIGHT",60,0)
+		'name', 'Attach',
+		'description', 'Attach to party/raid frames.',
+		'default', false,
+		'getFunc', function() return db.Attach end,
+		'setFunc', function(value)
+			db.Attach = value
+			AttachToggle(panel)
+			ATT:LoadPositions()
+		end)
+	attach:SetPoint("TOPLEFT", panel, "TOPLEFT", 330, -10)
 
-	local growLeft = panel:MakeToggle(	
-		'name', 'Grow Left',	
-		'description', 'Grow icons to the left',	
-		'default', false,	
-		'getFunc', function() return db.growLeft end,	
-		'setFunc', function(value) db.growLeft = value ATT:LoadPositions() end)
-	growLeft:SetPoint("TOPLEFT",attach,"TOPLEFT",0,-25)
+	-- Lock
+	local lock = panel:MakeToggle(
+		'name', 'Lock',
+		'description', 'Lock anchors from being draggable.',
+		'default', false,
+		'getFunc', function() return db.Lock end,
+		'setFunc', function(value) db.Lock = value Lock() end)
+	lock:SetPoint("RIGHT", attach, "LEFT", -40, 0)
+	panel.lock = lock
+
+--[[
+
+DISPLAY
+
+]]
+
+	-- Scale
+	local scale = panel:MakeSlider(
+		'name', 'Scale',
+		'description', 'Adjust the scale of icons',
+		'minText', '-',
+		'maxText', '+',
+		'minValue', 0.1,
+		'maxValue', 5,
+		'step', 0.05,
+		'default', 1,
+		'current', db.Scale,
+		'setFunc', function(value) db.Scale = value ATTIcons:SetScale(db.Scale) end)
+	scale:SetPoint("TOPLEFT", panel, "TOPLEFT", 25, -55)
+	scale:SetWidth(90)
+
+	local hidden = panel:MakeToggle(
+		'name', 'Hidden',
+		'description', 'Only show icon on cooldown.',
+		'default', false,
+		'getFunc', function() return db.Hidden end,
+		'setFunc', function(value) db.Hidden = value ATT:UpdateAllAnchors() end)
+	hidden:SetPoint("TOPLEFT", scale, "TOPLEFT", 120, 5)
+
+	local glow = panel:MakeToggle(
+		'name', 'Glow',
+		'description', 'Glow icon when active.',
+		'default', true,
+		'getFunc', function() return db.Glow end,
+		'setFunc', function(value) db.Glow = value end)
+	glow:SetPoint("LEFT", hidden, "RIGHT", CheckOffsetX, 0)
+
+	local border = panel:MakeToggle(
+		'name', 'Border',
+		'description', 'Borders around icons.',
+		'default', true,
+		'getFunc', function() return db.Border end,
+		'setFunc', function(value) db.Border = value ATT:UpdateAllAnchors() end)
+	border:SetPoint("LEFT", glow, "RIGHT", CheckOffsetX, 0)
+
+	local left = panel:MakeToggle(
+		'name', 'Grow Left',
+		'description', 'Grow icons to the left.',
+		'default', false,
+		'getFunc', function() return db.Left end,
+		'setFunc', function(value) db.Left = value ATT:UpdateAllAnchors() end)
+	left:SetPoint("TOPLEFT", scale, "TOPLEFT", 0, -25)
 	
-	local tworows = panel:MakeToggle(	
-		'name', 'Two rows',	
-		'description', 'Show icons on two rows',	
-		'default', false,	
-		'getFunc', function() return db.tworows end,	
-		'setFunc', function(value) db.tworows = value ATT:LoadPositions() ATT:UpdateAllAnchorIcons() end)
-	tworows:SetPoint("LEFT",growLeft,"RIGHT",60,0)
-	
-	
-	local horizontal = panel:MakeToggle(	
-		'name', 'Horizontal',	
-		'description', 'Show icons under raid frames\n(works when using horizontal group and attached raid frames)',
-		'default', false,	
-		'getFunc', function() return db.horizontal end,	
-		'setFunc', function(value) db.horizontal = value ATT:LoadPositions() end)
-	horizontal:SetPoint("LEFT",tworows,"RIGHT",60,0)
-	
-	local showIconBorders = panel:MakeToggle(	
-		'name', 'Draw borders',	
-		'description', 'Draw borders around icons',	
-		'default', true,	
-		'getFunc', function() return db.showIconBorders end,	
-		'setFunc', function(value) db.showIconBorders = value ATT:UpdateAllAnchors() end)
-	showIconBorders:SetPoint("LEFT",horizontal,"RIGHT",65,0)
-	
-	local arena = panel:MakeToggle(	
-		'name', 'Arena',	
-		'description', 'Enable icons in Arena',	
-		'default', false,	
-		'getFunc', function() return db.arena end,	
-		'setFunc', function(value) db.arena = value ZoneSet() end)
-	arena:SetPoint("TOPLEFT",growLeft,"TOPLEFT",0,-45)
-	
-	local dungeons = panel:MakeToggle(	
-		'name', 'Dungeons',	
-		'description', 'Enable icons in Dungeons',	
-		'default', false,	
-		'getFunc', function() return db.dungeons end,	
-		'setFunc', function(value) db.dungeons = value ZoneSet() end)
-	dungeons:SetPoint("LEFT",arena,"RIGHT",40,0)
-	
-	local inraid = panel:MakeToggle(	
-		'name', 'Raid/Bg',	
-		'description', 'Enable icons in Raid / BGs\n(only works for your group)',
-		'default', false,	
-		'getFunc', function() return db.inraid end,	
-		'setFunc', function(value) db.inraid = value ZoneSet() end)
-	inraid:SetPoint("LEFT",dungeons,"RIGHT",65,0)
-		
-	local outside = panel:MakeToggle(	
-		'name', 'Outside World',	
-		'description', 'Enable icons in Outside World',	
-		'default', false,	
-		'getFunc', function() return db.outside end,	
-		'setFunc', function(value) db.outside = value ZoneSet() end)
-	outside:SetPoint("LEFT",inraid,"RIGHT",60,0)
-	
-	local showTrinket = panel:MakeToggle(	
-		'name', 'Trinket',	
-		'description', 'Show PvP Trinket',	
-		'default', false,	
-		'getFunc', function() return db.showTrinket end,	
-		'setFunc', function(value) db.showTrinket = value ATT:UpdateAllAnchors() end)
-	showTrinket:SetPoint("TOPLEFT",arena,"TOPLEFT",0,-45)
-	
-	local showRacial = panel:MakeToggle(	
-		'name', 'Racial',	
-		'description', 'Show Racial icons',	
-		'default', false,	
-		'getFunc', function() return db.showRacial end,	
-		'setFunc', function(value) db.showRacial = value ATT:UpdateAllAnchors() end)
-	showRacial:SetPoint("LEFT",showTrinket,"RIGHT",50,0)
-	
-	local showTooltip = panel:MakeToggle(	
-		'name', 'Show Tooltip',	
-		'description', 'Show tooltips over icons',
-		'default', false,	
-		'getFunc', function() return db.showTooltip end,	
-		'setFunc', function(value) db.showTooltip = value end)
-	showTooltip:SetPoint("LEFT",showRacial,"RIGHT",70,0)
-		
-	local title2, subText2 = panel:MakeTitleTextAndSubText("","Enable in:")
-	title2:ClearAllPoints()
-	title2:SetPoint("TOPLEFT",panel,"TOPLEFT",20,-110)
-	
-	local title2, subText2 = panel:MakeTitleTextAndSubText("","Show:")
-	subText2:ClearAllPoints()
-	subText2:SetPoint("TOPLEFT",panel,"TOPLEFT",20,-160)
-	
+	local rows = panel:MakeToggle(
+		'name', 'Two Rows',
+		'description', 'Show icons on two rows.',
+		'default', false,
+		'getFunc', function() return db.Rows end,
+		'setFunc', function(value)
+			db.Rows = value
+			RowToggle(panel)
+			ATT:UpdateAllAnchorIcons()
+		end)
+	rows:SetPoint("LEFT", left, "RIGHT", CheckOffsetX + 20, 0)
+
+	local horiz = panel:MakeToggle(
+		'name', 'Horizontal',
+		'description', 'Show icons under attached frame.',
+		'default', false,
+		'getFunc', function() return db.Horiz end,
+		'setFunc', function(value) db.Horiz = value ATT:LoadPositions() end)
+	horiz:SetPoint("LEFT", rows, "RIGHT", CheckOffsetX + 20, 0)
+	panel.horiz = horiz
+
+	local tooltip = panel:MakeToggle(
+		'name', 'Tooltip',
+		'description', 'Show tooltips on mouseover.',
+		'default', false,
+		'getFunc', function() return db.Tooltip end,
+		'setFunc', function(value) db.Tooltip = value end)
+	tooltip:SetPoint("LEFT", horiz, "RIGHT", CheckOffsetX + 20, 0)
+
+--[[
+
+OFFSETS
+
+]]
+
+	local offsetX = panel:MakeSlider(
+		'name', 'X Offset',
+		'description', 'X Offset.',
+		'minText', '',
+		'maxText', '',
+		'minValue', -100,
+		'maxValue', 100,
+		'step', 1,
+		'default', 0,
+		'current', db.OffX or 0,
+		'setFunc', function(value) db.OffX = value ATT:LoadPositions() end,
+		'currentTextFunc', function(value) return value end)
+	offsetX:SetPoint("TOP", left, "BOTTOM", 25, -30)
+	offsetX:SetWidth(SliderWidth)
+	panel.offsetX = offsetX
+
+	local offsetY = panel:MakeSlider(
+		'name', 'Y Offset',
+		'description', 'Y Offset.',
+		'minText', '',
+		'maxText', '',
+		'minValue', -100,
+		'maxValue', 100,
+		'step', 1,
+		'default', 0,
+		'current', db.OffY or 0,
+		'setFunc', function(value) db.OffY = value ATT:LoadPositions() end,
+		'currentTextFunc', function(value) return value end)
+	offsetY:SetPoint("LEFT", offsetX, "RIGHT", 20, 0)
+	offsetY:SetWidth(SliderWidth)
+	panel.offsetY = offsetY
+
+	-- Spacing
+	local spacingX = panel:MakeSlider(
+		'name', 'Icon Spacing',
+		'description', 'Icon Spacing.',
+		'minText', '',
+		'maxText', '',
+		'minValue', 0,
+		'maxValue', 20,
+		'step', 1,
+		'default', 0,
+		'current', db.SpaceX,
+		'setFunc', function(value) db.SpaceX = value ATT:UpdateAllAnchorIcons() end,
+		'currentTextFunc', function(value) return value end)
+	spacingX:SetPoint("LEFT", offsetY, "RIGHT", 20, 0)
+	spacingX:SetWidth(SliderWidth)
+
+	local spacingY = panel:MakeSlider(
+		'name', 'Row Spacing',
+		'description', 'Row spacing.',
+		'minText', '',
+		'maxText', '',
+		'minValue', 0,
+		'maxValue', 20,
+		'step', 1,
+		'default', 0,
+		'current', db.SpaceY,
+		'setFunc', function(value) db.SpaceY = value ATT:UpdateAllAnchorIcons() end,
+		'currentTextFunc', function(value) return value end)
+	spacingY:SetPoint("LEFT", spacingX, "RIGHT", 20, 0)
+	spacingY:SetWidth(SliderWidth)
+	panel.spacingY = spacingY
+
+--[[
+
+ZONE
+
+]]
+
+	local arena = panel:MakeToggle(
+		'name', 'Arena',
+		'description', 'Enable in Arena.',
+		'default', false,
+		'getFunc', function() return db.Arena end,
+		'setFunc', function(value) ZoneSet("Arena", value) end)
+	arena:SetPoint("TOP", offsetX, "BOTTOM", -25, -27)
+
+	local dungeon = panel:MakeToggle(
+		'name', 'Dungeon',
+		'description', 'Enable in Dungeon.',
+		'default', false,
+		'getFunc', function() return db.Dungeon end,
+		'setFunc', function(value) ZoneSet("Dungeon", value) end)
+	dungeon:SetPoint("LEFT", arena, "RIGHT", 40, 0)
+
+	local raid = panel:MakeToggle(
+		'name', 'Raid/BG',
+		'description', 'Enable in Raid/Battleground.\n\n|cFFFFFFFFOnly works for your group!',
+		'default', false,
+		'getFunc', function() return db.Raid end,
+		'setFunc', function(value) ZoneSet("Raid", value) end)
+	raid:SetPoint("LEFT", dungeon, "RIGHT", 65, 0)
+
+	local world = panel:MakeToggle(
+		'name', 'World',
+		'description', 'Enable in World.',
+		'default', false,
+		'getFunc', function() return db.World end,
+		'setFunc', function(value) ZoneSet("World", value) end)
+	world:SetPoint("LEFT", raid, "RIGHT", 60, 0)
+
+--[[
+
+TRINKET/RACIAL
+
+]]
+
+	local showTrinket = panel:MakeToggle(
+		'name', 'Trinket',
+		'description', 'Show PvP Trinket icon.',
+		'default', false,
+		'getFunc', function() return db.Trinket end,
+		'setFunc', function(value) db.Trinket = value ATT:UpdateAllAnchors() end)
+	showTrinket:SetPoint("TOP", world, "BOTTOM", -10, -15)
+
+	local showRacial = panel:MakeToggle(
+		'name', 'Racial',
+		'description', 'Show Racial icon.',
+		'default', false,
+		'getFunc', function() return db.Racial end,
+		'setFunc', function(value) db.Racial = value ATT:UpdateAllAnchors() end)
+	showRacial:SetPoint("LEFT", showTrinket, "RIGHT", 50, 0)
+
+	AttachToggle(panel)
+	RowToggle(panel)
+
 	self:CreateAbilityEditor()
 end
 
-local function count(t) local i = 0 for k,v in pairs(t) do i = i + 1  end return i end
-
 function ATT:UpdateScrollBar()
-	local btns = self.btns
 	local scrollframe = self.scrollframe
-	local classSelectedSpecs = db.abilities[db.classSelected] 
+	local btns = self.btns
+	local SelClassSpecs = db.Spells[db.SelClass] 
 	local line = 1
-	
-	if not btns then return end
-	
-	for specID, abilities in pairs(classSelectedSpecs) do
+
+	for specID, abilities in pairs(SelClassSpecs) do
 		for abilityIndex, abilityTable in pairs(abilities) do
-			local ability, id, cooldown, talent, spellStatus = abilityTable.ability, abilityTable.id, abilityTable.cooldown, abilityTable.talent, abilityTable.spellStatus
-			local order = abilityTable.order or 1	
-			spectexture  =  "Interface\\Buttons\\UI-MicroButton-"..db.classSelected
+			local btn = btns[line]
+			local ability, id, cooldown, spellStatus = abilityTable.ability, abilityTable.id, abilityTable.cooldown, abilityTable.spellStatus	
 			abilitytexture = self:FindAbilityIcon(ability, id)
-			
-			if spellStatus ~= "DISABLED" then
-				btns[line]:SetText("   |T"..(abilitytexture or "")..":18|t " ..ability)
-			else
-				btns[line]:SetText("   |cff808080|T"..(abilitytexture or "")..":18|t " ..ability.."|r")
+
+			if ( not btn ) then
+				btn = CreateListButton(scrollframe, line)
+
+				if ( line == 1 ) then
+					btn:SetPoint("TOPLEFT", scrollframe, "TOPLEFT", 2, 0)
+				else
+					btn:SetPoint("TOP", btns[line - 1], "BOTTOM")
+				end
+
+				btns[line] = btn
 			end
-			
-			if btns[line]:GetText() ~= scrollframe.currentButton then
-				btns[line]:SetNormalTexture("")
-			else 
-				btns[line]:SetNormalTexture("Interface\\ContainerFrame\\UI-Icon-QuestBorder")
-				btns[line]:GetNormalTexture():SetTexCoord(0.11,0.88,0.02,0.97)
-				btns[line]:GetNormalTexture():SetBlendMode("ADD") 
-				scrollframe.addeditbox:SetText(ability)
+
+			if ( spellStatus == false ) then
+				btn:SetText("|cff808080|T"..(abilitytexture or "")..":18|t " ..ability.."|r")
+			else
+				btn:SetText("|T"..(abilitytexture or "")..":18|t " ..ability)
+			end
+
+			if ( ability ~= scrollframe.currentButton and line ~= scrollframe.currentButton ) then
+				btn:UnlockHighlight()
+			else
+				btn:LockHighlight()
 				scrollframe.ideditbox:SetText(id or "")
 				scrollframe.cdeditbox:SetText(cooldown or "")
-				scrollframe.order:SetValue(tostring(order or 1))
-				
-				scrollframe.dropdown2.initialize()
-				scrollframe.dropdown2:SetValue(tostring(specID or "ALL"))
-				
-				scrollframe.spellStatusbox.initialize()
-				scrollframe.spellStatusbox:SetValue(tostring(spellStatus or "ENABLED"))
+				scrollframe.order:SetValue(abilityTable.order or 1)
+
+				scrollframe.spec.initialize()
+				scrollframe.spec:SetValue(specID or "*")
+
+				scrollframe.status.initialize()
+				scrollframe.status:SetValue(tostring(spellStatus == false and "false" or "true"))
 			end
-			
-			btns[line]:Show()
+
+			btn:Show()
 			line = line + 1
 		end 
 	end 			
-	 for i=line,25 do btns[i]:Hide() end
-end
 
-function ATT:getSpecs()
-	local classSpecs = dbSpecs[db.classSelected]
-	local specs = {"ALL", "All specs"}
-	for specName,_ in pairs(classSpecs) do
-		table.insert(specs, specName)
-		table.insert(specs, specName)
-	end
-	
-	return specs
+	-- Button Overflow
+	for i=line, #self.btns do btns[i]:Hide() end
 end
 
 function ATT:CreateAbilityEditor()
 	local panel = self.panel
-	local btns = {}
-	self.btns = btns
-	local scrollframe = CreateFrame("ScrollFrame", "ATTScrollFrame",panel,"UIPanelScrollFrameTemplate")
-	local child = CreateFrame("ScrollFrame" ,"ATTScrollFrameChild" , scrollframe )
-	child:SetSize(1, 1)
-	scrollframe:SetScrollChild(child)
-	local button1 = CreateListButton(child,"25")
-	button1:SetPoint("TOPLEFT",child,"TOPLEFT",2,0)
-	btns[#btns+1] = button1
-	for i=2,25 do
-		local button = CreateListButton(child,tostring(i))
-		button:SetPoint("TOPLEFT",btns[#btns],"BOTTOMLEFT")
-		btns[#btns+1] = button
+	self.btns = {}
+
+	if ( not db.SelClass ) then
+		db.SelClass = "WARRIOR"
 	end
-	scrollframe:SetScript("OnShow",function(self) if not db.classSelected then db.classSelected = "WARRIOR" end ATT:UpdateScrollBar()  end)
+
+	local scrollframe = CreateFrame("ScrollFrame", "ATTScrollFrame", panel, "UIPanelScrollFrameTemplate")
+	local child = CreateFrame("ScrollFrame" ,"ATTScrollFrameChild" , scrollframe)
+	scrollframe:SetScrollChild(child)
+	child:SetSize(1, 1)
 	self.scrollframe = child
-	
-	scrollframe:SetSize(130,176)
-	scrollframe:SetPoint('LEFT',10,-100)
-	child.dropdown2 = nil
-   
-	local dropdown = panel:MakeDropDown(
-	   'name', ' Class',
-		'description', 'Pick a class to edit abilities',
-		'values', {
-			"WARRIOR", "Warrior",
-			"PALADIN", "Paladin",
-			"PRIEST", "Priest",
-			"SHAMAN", "Shaman",
-			"DRUID", "Druid",
-			"ROGUE", "Rogue",
-			"MAGE", "Mage",
-			"WARLOCK", "Warlock",
-			"HUNTER", "Hunter",
-			"DEATHKNIGHT", "DeathKnight",
-		 },
-		'default', 'WARRIOR',
-		'getFunc', function() return db.classSelected end ,
-		'setFunc', function(value)
-			db.classSelected = value
+
+	scrollframe:SetSize(130,126)
+	scrollframe:SetPoint("TOPLEFT", 15, -285)
+
+	local class = panel:MakeDropDown(
+		"name", "",
+		"description", "Pick a class to edit abilities.",
+		"values", GetLocalClassList(),
+		"default", 'WARRIOR',
+		"getFunc", function() return db.SelClass end,
+		"setFunc", function(value)
+			db.SelClass = value
 			ATT:UpdateScrollBar()
-			child.dropdown2.initialize()
-			child.dropdown2:SetValue("ALL")
-			child.dropdown2.values = ATT:getSpecs()
+			child.spec.initialize()
+			child.spec:SetValue("*")
+			child.spec.values = GetSelectedSpecs()
 		end)
-	dropdown:SetPoint("TOPLEFT",scrollframe,"TOPRIGHT",15,-8)
-	child.dropdown = dropdown  	
-	
-	local dropdown2 = panel:MakeDropDown(
-	   'name', ' Specialization',
-		'description', 'Pick a spec',
-		'values', ATT:getSpecs(),
-		'default', 'ALL',
-		'current', 'ALL',
-		'setFunc', function(value) end
-	)
-	
-	dropdown2:SetPoint("TOPLEFT",dropdown,"BOTTOMLEFT",0,-15)
-	child.dropdown2 = dropdown2
-	
-	local spellStatusbox = panel:MakeDropDown(
+	class:SetPoint("TOP", scrollframe, "TOP", 0, 30)
+	child.class = class  	
+
+	local spec = panel:MakeDropDown(
+		"name", " Specialization",
+		"description", "Chosen specialization.",
+		"values", GetSelectedSpecs(),
+		"default", "*",
+		"current", "*",
+		"setFunc", NULL)
+	spec:SetPoint("TOPLEFT", scrollframe, "TOPRIGHT", 15, -15)
+	child.spec = spec
+
+	local status = panel:MakeDropDown(
 	   'name', ' Status',
-		'description', 'Enable or disable ability',
+		'description', 'Enable or disable ability.',
 		'values', {
-					"ENABLED", "Enabled",
-					"DISABLED", "Disabled",
+					"true", "Enabled",
+					"false", "Disabled",
 		 },
-		'default', 'ENABLED',
-		'current', 'ENABLED',
-		'setFunc', function(value) end)
-	spellStatusbox:SetPoint("TOPLEFT",dropdown,"BOTTOMLEFT",115,30)
-	child.spellStatusbox = spellStatusbox
+		'default', 'true',
+		'current', 'true',
+		'setFunc', NULL)
+	status:SetPoint("LEFT", spec, "RIGHT", -26, 0)
+	child.status = status
 
-	local addeditbox = CreateEditBox("Ability Name",scrollframe,90,25)
-	child.addeditbox = addeditbox	
-	addeditbox:SetPoint("TOPLEFT",dropdown2,"BOTTOMLEFT",20,-15)
-
-	local ideditbox = CreateEditBox("Ability ID",scrollframe,70,25)
-	ideditbox:SetPoint("LEFT",addeditbox,"RIGHT",7,0)
+	local ideditbox = CreateEditBox("Spell ID", scrollframe, 55, 25)
+	ideditbox:SetPoint("TOPLEFT", spec, "BOTTOMLEFT", 25, -15)
 	child.ideditbox = ideditbox
 
-	local cdeditbox = CreateEditBox("CD (s)",scrollframe,40,25)
-	cdeditbox:SetPoint("LEFT",ideditbox,"RIGHT",7,0)
+	local cdeditbox = CreateEditBox("CD (s)", scrollframe, 35, 25)
+	cdeditbox:SetPoint("LEFT", ideditbox, "RIGHT", 7, 0)
 	child.cdeditbox = cdeditbox
-	
+
+	-- GroupedCD list
+	local groupedCDList = '|cFFFFFFFFAbilities with same ID share a cooldown.\n\n|cFFFF0000Example: Pummel will trigger Shield Bash.|r\n'
+	for class, spells in pairs(groupedCooldowns) do
+		groupedCDList = groupedCDList.."\n"..class.."\n"
+		for Spell, Type in pairs(spells) do
+			groupedCDList = groupedCDList..Type.." - "..Spell.."\n"
+		end
+	end
+
+	local groupedCD = panel:MakeButton(
+		'name', '|TInterface\\DialogFrame\\UI-Dialog-Icon-AlertNew:16|t Grouped Spells',
+		'description', groupedCDList,
+		'func', NULL)
+	groupedCD:SetPoint("TOP", ideditbox, "BOTTOM", 20, 0)
+	groupedCD:SetNormalTexture(nil)
+	groupedCD:SetPushedTexture(nil)
+
 	local order = panel:MakeSlider(	
-		'name', 'Icon Order',	
-		'description', 'Adjust icon order priority\nAll Specs icons are always first',
-		'minText', '1',
-		'maxText', '6',
+		'name', 'Icon Order',
+		'description', 'Adjust icon order priority.\n\n|cFFFFFFFFSpec icons are ALWAYS displayed last!\n\n|cFFFF0000*Work in progress!|r',
+		'minText', '',
+		'maxText', '',
 		'minValue', 1,
-		'maxValue', 6,
+		'maxValue', 69,
 		'step', 1,
-		'vertical', 1,
 		'default', 1,
 		'current',  1,
-		'setFunc', function() end,	
-		'currentTextFunc', function(value) return string.format("%.0f",value) end)
-	order:SetPoint("LEFT",dropdown2,"RIGHT",0,5)
+		'setFunc', NULL,
+		'currentTextFunc', function(value) return value end)
+	order:SetPoint("TOP", status, "BOTTOM", 0, -17)
 	order:SetWidth(100)
 	child.order = order
 
 	local addbutton = panel:MakeButton(	
-		'name', 'Add/Update',	
-		'description', "Add / Update ability",	
-		'func', function() 	
-			local id = ideditbox:GetText():match("^[0-9]+$")
-			local spec = dropdown2.value	
-			local ability = addeditbox:GetText()
-			local iconfound = ATT:FindAbilityIcon(ability, id)
-			local cdtext = cdeditbox:GetText():match("^[0-9]+$")
-			local spellStatus = spellStatusbox.value	
-			local order = string.format("%.0f",order.value)
-			if iconfound and cdtext and id and (not spec or db.abilities[db.classSelected] and db.abilities[db.classSelected][spec]) then	
-				print("Added/Updated: |cffFF4500"..ability.."|r")
-				local abilities = db.abilities[db.classSelected][spec or "ALL"]	
-				local _ability, _index = self:FindAbilityByName(abilities, ability)
-				if _ability and _index then	
-					-- editing:	
-					abilities[_index] = {ability = ability, cooldown = tonumber(cdtext), id = tonumber(id), spellStatus = spellStatus and tostring(spellStatus), order = tonumber(string.format("%.0f",order)) }	
-				else	
-					-- adding new:	
-					table.insert(abilities, {ability = ability, cooldown = tonumber(cdtext), id = tonumber(id), spellStatus = spellStatus and tostring(spellStatus), order = tonumber(string.format("%.0f",order))  })
-				end
-			table.sort(abilities, function(a, b) 	
-			if (a.order or 1) == (b.order or 1) then	
-			return (a.id) < (b.id) end
-			return (a.order or 1) < (b.order or 1) end)	
-				child.currentButton = ability	
-				ATT:UpdateScrollBar()
-				ATT:UpdateAllAnchors()
-			else	
-				print("Invalid/blank:|cffFF4500 Ability Name, ID or Cooldown|r")
-			end
-	end)
-	addbutton:SetPoint("TOPLEFT",addeditbox,"BOTTOMLEFT",-5,-20)
-	
-	local removebutton = panel:MakeButton(	
-		'name', 'Remove',
-		'description', 'Remove ability',
+		'name', 'Add/Update',
+		'description', "Add / Update Ability",
 		'func', function()
-	     		local spec = dropdown2.value
-	     		local _ability, _index = self:FindAbilityByName(db.abilities[db.classSelected][spec or "ALL"], addeditbox:GetText())
-	     		if _ability and _index then
-					table.remove(db.abilities[db.classSelected][spec], _index)
-					print("Removed ability |cffFF4500" .. addeditbox:GetText().."|r")
-					addeditbox:SetText("");
-					ideditbox:SetText("");
-					cdeditbox:SetText("");
+			local _, SpellName, SpellIcon, SpellSpec, SpellCD, SpellStatus, SpellOrder
+			local SpellID = ideditbox:GetText():match("^[0-9]+$")
+
+			if ( SpellID ) then
+				SpellCD = cdeditbox:GetText():match("^[0-9]+$")
+
+				if ( SpellCD ) then
+					SpellName, _, SpellIcon = GetSpellInfo(SpellID)
+					SpellSpec = spec.value
+					SpellStatus = status.value
+					SpellOrder = order.value
+
+					if ( SpellIcon and SpellName and (not SpellSpec or db.Spells[db.SelClass] and db.Spells[db.SelClass][SpellSpec]) ) then
+						SettingsPrint("Added/Updated", SpellName)
+
+						local Abilities = db.Spells[db.SelClass][SpellSpec or "*"]
+						local AbilityNameExist, AbilityIndexExist = self:FindAbilityByName(Abilities, SpellName)
+
+						-- Updated/New Data
+						local Data = {}
+						Data.ability = SpellName
+						Data.cooldown = tonumber(SpellCD)
+						Data.id = tonumber(SpellID)
+
+						if ( SpellStatus == "false" ) then
+							Data.spellStatus = false
+						end
+
+						if ( SpellOrder > 1 ) then
+							Data.order = SpellOrder
+						end
+
+						-- Save it
+						if ( AbilityNameExist and AbilityIndexExist ) then
+							Abilities[AbilityIndexExist] = Data
+						else
+							insert(Abilities, Data)
+						end
+
+						sort(Abilities, SortAbilities)
+
+						child.currentButton = SpellName
+						ATT:UpdateScrollBar()
+						ATT:UpdateAllAnchors()
+
+						return
+					end
+				end
+			end
+
+			SettingsPrint("Invalid/Blank", "ID or Cooldown")
+	end)
+	addbutton:SetPoint("TOP", ideditbox, "BOTTOM", 25, -25)
+
+	local removebutton = panel:MakeButton(
+		'name', 'Remove',
+		'description', 'Remove Ability',
+		'func', function()
+				local SpellName = GetSpellInfo(ideditbox:GetText())
+	     		local SpellSpec = spec.value
+	     		local AbilityNameExist, AbilityIndexExist = self:FindAbilityByName(db.Spells[db.SelClass][SpellSpec or "*"], SpellName)
+
+	     		if ( AbilityNameExist and AbilityIndexExist ) then
+					remove(db.Spells[db.SelClass][SpellSpec], AbilityIndexExist)
+
+					ideditbox:SetText("")
+					cdeditbox:SetText("")
 					order:SetValue(1)
-					child.currentButton = nil;
-					ATT:UpdateScrollBar();
+					child.currentButton = nil
+					ATT:UpdateScrollBar()
 					ATT:UpdateAllAnchors()
+
+					SettingsPrint("Removed Ability", SpellName)
 				else
-					print("Invalid/blank:|cffFF4500 Ability ID|r")
+					SettingsPrint("Invalid/Blank", "Ability ID")
 				end
 	end)
-	removebutton:SetPoint("TOPLEFT",addeditbox,"BOTTOMLEFT",120,-20)
-	removebutton:SetWidth(100)
+	removebutton:SetPoint("LEFT", addbutton, "RIGHT", 10, 0)
+	removebutton:SetWidth(90)
 end
 
 ATT:RegisterEvent("VARIABLES_LOADED")
-ATT:SetScript("OnEvent",ATT_OnLoad)
+ATT:SetScript("OnEvent", ATT_OnLoad)
