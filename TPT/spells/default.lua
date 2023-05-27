@@ -40,7 +40,7 @@ b.Spells = {
 		{44572, 40}, -- Deep Freeze
 		{11958, 384}, -- Cold Snap
 
-		{11113, 30} -- Blast Wave
+		{11113, 30}, -- Blast Wave
 		{11129, 120}, -- Combustion
 		{42950, 20}, -- Dragon's Breath
 
