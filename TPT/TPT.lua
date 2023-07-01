@@ -2,6 +2,7 @@ local V = 7.55
 
 local Addon, Default = ...
 
+local floor = math.floor
 local sformat = string.format
 local match = string.match
 local remove = table.remove
@@ -14,6 +15,7 @@ local UnitGUID = UnitGUID
 local IsInInstance = IsInInstance
 local UnitRace = UnitRace
 local CooldownFrame_Set = CooldownFrame_Set
+local GetTime = GetTime
 local Timer = C_Timer.NewTicker
 local TimerAfter = C_Timer.After
 local LOCALIZED_CLASS_NAMES_MALE = LOCALIZED_CLASS_NAMES_MALE
@@ -62,7 +64,6 @@ if ( GetBuildInfo() == "3.3.5" ) then
 end
 
 local anchors = {}
-local activeGUIDS = {}
 
 local validUnits = {
 	["player"] = 5,
@@ -471,7 +472,6 @@ function TPT:CreateAnchors()
 			anchor:SetMovable(true)
 			anchor:Show()
 			anchor.icons = {}
-			anchor.spells = {}
 			anchor.HideIcons = function() local icons = anchor.icons for i=1,#icons do local icon = icons[i] icon:Hide() icon.inUse = nil end end
 			anchor:SetScript("OnMouseDown",function(self,button) if button == "LeftButton" and not DB.Attach then self:StartMoving() end end)
 			anchor:SetScript("OnMouseUp",function(self,button) if button == "LeftButton" and not DB.Attach then self:StopMovingOrSizing() TPT:SavePositions() end end)
@@ -486,10 +486,15 @@ function TPT:CreateAnchors()
 end
 
 local function CreateIcon(anchor)
-	local icon = CreateFrame("Frame",anchor:GetName().."Icon".. (#anchor.icons+1),TPTIcons,"ActionButtonTemplate")
-	icon:SetSize(40,40) 	
-	local cd = CreateFrame("Cooldown",icon:GetName().."Cooldown",icon,"CooldownFrameTemplate")
+	local icon = CreateFrame("Frame", anchor:GetName().."Icon"..(#anchor.icons+1), TPTIcons, "ActionButtonTemplate")	
+	local cd = CreateFrame("Cooldown",icon:GetName().."Cooldown", icon, "CooldownFrameTemplate")
 	icon.cd = cd
+	icon:SetSize(40,40) 
+
+	local texture = icon:CreateTexture(nil,"ARTWORK")
+	texture:SetAllPoints(true)
+	icon.texture = texture
+
 	icon.Start = function(sentCD)
 		if ( icon.inUse ) then
 			icon.starttime = GetTime()
@@ -502,42 +507,30 @@ local function CreateIcon(anchor)
 				icon.flash.D:Play()
 			end
 
-			if ( icon.inUse ) then
-				icon:Show()
-				icon.active = true
-			end
-			activeGUIDS[icon.GUID] = activeGUIDS[icon.GUID] or {}
-			activeGUIDS[icon.GUID][icon.ability] = activeGUIDS[icon.GUID][icon.ability] or {}
-			activeGUIDS[icon.GUID][icon.ability].starttime = icon.starttime
-			activeGUIDS[icon.GUID][icon.ability].cooldown =  icon.cooldown
+			icon:Show()
+			icon.active = true
 
 			if ( DB.Hidden ) then
 				TPT:ToggleIconDisplay(anchor.i)
 			end
 		end
 	end
+
 	icon.Stop = function()
-		CooldownFrame_Set(cd, 0, 0, 0)
-		icon.starttime = 0
-		activeGUIDS[icon.GUID] = activeGUIDS[icon.GUID] or {}	
-		if activeGUIDS[icon.GUID][icon.ability] then
-			activeGUIDS[icon.GUID][icon.ability] = {}	
-			activeGUIDS[icon.GUID][icon.ability].starttime = 0
-			activeGUIDS[icon.GUID][icon.ability].cooldown =  0
+		if ( icon.starttime ) then
+			CooldownFrame_Set(cd, 0, 0, 0)
+			icon.starttime = nil
 		end
 	end
 
-	icon.SetTimer = function(starttime,cooldown)
-		if starttime and cooldown then
-			CooldownFrame_Set(cd,starttime,cooldown,1)
-			icon.active = true	
-			icon.starttime = starttime	
+	icon.SetTimer = function(starttime, cooldown)
+		if ( starttime and cooldown ) then
+			CooldownFrame_Set(cd, starttime, cooldown, 1)
+			icon.active = true
+			icon.starttime = starttime
 			icon.cooldown = cooldown	
 		end
 	end
-	local texture = icon:CreateTexture(nil,"ARTWORK")
-	texture:SetAllPoints(true)
-	icon.texture = texture
 
 	cd:HookScript("OnHide",function()
 		icon.active = nil
@@ -567,7 +560,9 @@ local function CreateIcon(anchor)
 	return icon
 end
 
-function TPT:AddIcon(icons,anchor)
+function TPT:AddIcon(anchor)
+	local icons = anchor.icons
+
 	local newicon = CreateIcon(anchor)
 	icons[#icons+1] = newicon
 
@@ -581,7 +576,7 @@ function TPT:ApplyIconTextureBorder(icon)
 		icon.texture:SetTexCoord(0.07,0.9,0.07,0.90)
 	end
 end
-	
+
 function TPT:ToggleAnchorDisplay()
 	for i=1, 4 do
 		local anchor = anchors[i]
@@ -602,7 +597,6 @@ function TPT:ToggleAnchorDisplay()
 						Icons[j].showing = nil	
 					end
 
-					anchor.spells = {}
 					anchor:HideIcons()
 				end
 
@@ -614,133 +608,112 @@ function TPT:ToggleAnchorDisplay()
 	end
 end
 
-local function UpdateAnchorAdd(numIcons, anchor, abilityTable)
-	insert(anchor.spells, abilityTable)
-
-	local icon = TPT:UpdateAnchorIcon(anchor, numIcons, abilityTable)
-	activeGUIDS[icon.GUID] = activeGUIDS[icon.GUID] or {}
-	if activeGUIDS[icon.GUID][icon.ability] then
-		icon.SetTimer(activeGUIDS[icon.GUID][icon.ability].starttime,activeGUIDS[icon.GUID][icon.ability].cooldown)
+local function UpdateAnchorIconVisibility(Icon, Time)
+	if ( DB.Hidden and not Icon.starttime and not Icon.active ) then
+		Icon.Stop()
 	else
-		icon.Stop()
+		if ( Icon.starttime and (((Time or GetTime()) - Icon.starttime) < Icon.cooldown) ) then
+			Icon.SetTimer(Icon.starttime, Icon.cooldown)
+		else
+			Icon:Show()
+		end
 	end
-
-	return numIcons + 1
 end
 
-function TPT:UpdateAnchor(unit, i, PvPTrinket, TraceID, tcooldown)
-	if not self:IsShown() then return end
+function TPT:UpdateAnchor(Unit, i, PvPTrinket, TraceID)
+	if ( not self:IsShown() ) then return end
 
-	local _, class = UnitClass(unit)
-	local guid = UnitGUID(unit)
+	local GUID = UnitGUID(Unit)
 
-	if not class or not guid then return end
+	if ( not GUID ) then return end
 
-	local _, race = UnitRace(unit)
+	local _, Class = UnitClass(Unit)
+	local _, Race = UnitRace(Unit)
 
-	local anchor = anchors[i]	
-	anchor.GUID = guid	
-	anchor.class = class
-	anchor.race = race
-	local icons = anchor.icons
-	local numIcons = 1
+	local Anchor = anchors[i]
+	local Icons = Anchor.icons
+	local Num = 1
+	local Time = GetTime()
+
+	Anchor.GUID = GUID	
+	Anchor.class = Class
+	Anchor.race = Race
 
 	-- PvP Trinket
-	if ( DB.Trinket ) then 
-		local id, cooldown, ability = PvPTrinket[1], PvPTrinket[2], PvPTrinket[3]
-		local icon = icons[numIcons] or self:AddIcon(icons,anchor)
-		icon.texture:SetTexture(TraceID)
-		icon.GUID = anchor.GUID
-		icon.ability = ability
-		icon.abilityID = id
-		icon.cooldown = cooldown
-		icon.inUse = true
-		icon.spec = nil
-		TPT:ApplyIconTextureBorder(icon)
+	if ( DB.Trinket ) then
+		local TrinketID, TrinketCD, TrinketName = PvPTrinket[1], PvPTrinket[2], PvPTrinket[3]
+		_, Num = self:UpdateAnchorIcon(Anchor, Num, nil, Time, TrinketName, TrinketID, TrinketCD, TraceID)
+	else
+		local Icon = Icons[Num]
 
-		activeGUIDS[icon.GUID] = activeGUIDS[icon.GUID] or {}
-		if activeGUIDS[icon.GUID][icon.ability] then
-			icon.SetTimer(activeGUIDS[icon.GUID][ability].starttime,activeGUIDS[icon.GUID][ability].cooldown)
-		else
-			icon.Stop()
+		if ( Icon and (Icon.ability == DefaultTrinket[1][3] or Icon.ability == DefaultTrinket[2][3]) ) then
+			Icon:Hide()
+			Icon.showing = nil
+			Icon.inUse = nil
 		end
-		numIcons = numIcons + 1
-	elseif icons[1] and (icons[1].ability == DefaultTrinket[1][3] or icons[1].ability == DefaultTrinket[2][3]) then
-		icons[1]:Hide()
-		icons[1].showing = nil
-		icons[1].inUse = nil
-		icons[1].spec = nil
-		remove(icons, 1) 
-	end 
+	end
 
-	-- Racials
-	if ( DB.Racial ) then
-		local Racial = DefaultRacial[race]
-
-		if ( Racial ) then
-			local RacialID = Racial[1]
-			local RacialCD = Racial[2]
+	-- Racial
+	local Racial = DefaultRacial[Race]
+	if ( Racial ) then
+		if ( DB.Racial ) then
+			local RacialID, RacialCD = Racial[1], Racial[2]
 			local RacialName = GetSpellInfo(RacialID)
+			_, Num = self:UpdateAnchorIcon(Anchor, Num, nil, Time, RacialName, RacialID, RacialCD, GetSpellTexture(RacialID))
+		else
+			local Icon = Icons[Num]
 
-			local Icon = icons[numIcons] or self:AddIcon(icons, anchor)
-			local texture = GetSpellTexture(RacialID)
-			Icon.texture:SetTexture(texture)
-
-			Icon.GUID = anchor.GUID
-			Icon.ability = RacialName
-			Icon.abilityID = RacialID
-			Icon.cooldown = RacialCD
-			Icon.inUse = true
-			TPT:ApplyIconTextureBorder(Icon)
-
-			activeGUIDS[Icon.GUID] = activeGUIDS[Icon.GUID] or {}
-			if ( activeGUIDS[Icon.GUID][Icon.ability] ) then
-				local ActiveGUID = activeGUIDS[Icon.GUID][RacialName]
-				Icon.SetTimer(ActiveGUID.starttime, ActiveGUID.cooldown)
-			else
-				Icon.Stop()
+			if ( Icon and (Icon.abilityID == Racial[1]) ) then
+				Icon:Hide()
+				Icon.showing = nil
+				Icon.inUse = nil
 			end
-
-			numIcons = numIcons + 1
 		end
 	end
 
 	-- All Spells
-	for abilityIndex, abilityTable in pairs(DB.Spells[class]) do
-		if ( abilityTable.spellStatus ~= false and (not DefaultSpec[abilityTable.ability] or (anchor.spec and anchor.spec[abilityTable.ability])) ) then
-			numIcons = UpdateAnchorAdd(numIcons, anchor, abilityTable)
+	for Index, Abilities in pairs(DB.Spells[Class]) do
+		if ( Abilities.spellStatus ~= false and (not DefaultSpec[Abilities.ability] or (Anchor.spec and Anchor.spec[Abilities.ability])) ) then
+			_, Num = self:UpdateAnchorIcon(Anchor, Num, Abilities, Time)
 		end
 	end
 
 	-- Icon Overflow
-	for j=numIcons,#icons do
-		icons[j].seen = nil
-		icons[j].active = nil
-		icons[j].inUse = nil
-		icons[j].showing = nil
+	for i=Num,#Icons do
+		local Icon = Icons[i]
+		Icon.seen = nil
+		Icon.active = nil
+		Icon.inUse = nil
+		Icon.showing = nil
 	end
+
 	self:ToggleIconDisplay(i)
 end
 
-function TPT:UpdateAnchorIcon(anchor, numIcons, abilityTable)
-	local icons = anchor.icons
-	local ability, id, cooldown, spellStatus = abilityTable.ability, abilityTable.id, abilityTable.cooldown, abilityTable.spellStatus
-	local icon = icons[numIcons] or self:AddIcon(icons,anchor)
-	local texture = GetSpellTexture(id)
-	if texture then
-		icon.texture:SetTexture(texture)
+function TPT:UpdateAnchorIcon(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
+	local Icons = Anchor.icons
+	local Icon = Icons[Num] or TPT:AddIcon(Anchor)
+
+	if ( Ability ) then -- UpdateAnchorIcon
+		Name = Ability.ability
+		ID = Ability.id
+		CD = Ability.cooldown
+		Icon.spellStatus = Ability.spellStatus
+		Texture = GetSpellTexture(ID)
 	end
-	icon.GUID = anchor.GUID
-	icon.ability = ability
-	icon.abilityID = id
-	icon.cooldown = cooldown
-	icon.shouldShow = true
-	icon.inUse = true
-	icon.spellStatus = spellStatus
 
-	TPT:ApplyIconTextureBorder(icon)
+	Icon.texture:SetTexture(Texture)
+	Icon.ability = Name
+	Icon.abilityID = ID
+	Icon.cooldown = CD
+	Icon.inUse = true
+	TPT:ApplyIconTextureBorder(Icon)
 
-	return icon
+	if ( Time ) then
+		UpdateAnchorIconVisibility(Icon, Time)
+	end
+
+	return Icon, (Num + 1)
 end
 
 -- responsible for actual anchoring of icons
@@ -752,16 +725,18 @@ function TPT:ToggleIconDisplay(i)
 
 	-- hiding all icons before anchoring and deciding whether to show them
 	for k, icon in pairs(icons) do
-		if icon and icon.ability and icon.inUse then	
-			if icon.spec then	
-				icon.showing = (not DB.Hidden and icon.seen) or (DB.Hidden and activeGUIDS[icon.GUID][icon.ability] and icon.active)
-			else	
-				icon.showing = (activeGUIDS[icon.GUID] and activeGUIDS[icon.GUID][icon.ability] and icon.active) or (not DB.Hidden)
+		if icon and icon.ability and icon.inUse then
+			if icon.spec then
+				icon.showing = (not DB.Hidden and icon.seen) or (DB.Hidden and icon.active)
+			else
+				icon.showing = (icon.active or not DB.Hidden)
 			end
 		end
-		icon:ClearAllPoints()
+		
 
-		if icon and icon.ability and icon.showing then	
+		if icon and icon.ability and icon.showing then
+			icon:ClearAllPoints()
+
 			if DB.Rows then
 				if count == 1 then 	
 					icon:SetPoint(DB.Left and "TOPRIGHT" or "TOPLEFT", anchor, DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", DB.Left and -1 * DB.SpaceX or DB.SpaceX, 0)
@@ -813,8 +788,7 @@ function TPT:UpdateAllAnchors()
 			local Unit = "party"..i
 			local _, Class = UnitClass(Unit)
 
-			if ( not Class ) then break end
-			if ( not anchors[i] ) then break end
+			if ( not Class or not anchors[i] ) then break end
 
 			self:TrinketCheck(Unit, i) 
 		end
@@ -1012,7 +986,7 @@ function TPT:COMBAT_LOG_EVENT_UNFILTERED(...)
 			elseif ( SpellType == "BUFF" ) then
 				if ( DestGUID == SourceGUID and DB.Glow ) then
 					-- Blacklist: Berserk (Enchant), PvP Trinket
-					if ( SpellID ~= 59620 and SpellID ~= 59752 ) then
+					if ( SpellID ~= 59620 and SpellID ~= 42292 ) then
 						self:HandleGlow(SpellName, Event, Anchor)
 					end
 				end
@@ -1059,8 +1033,6 @@ function TPT:StopAllIcons()
 			Icon.seen = nil
 		end
 	end
-
-	wipe(activeGUIDS)
 end
 
 local function TPT_OnLoad(self)
@@ -1324,7 +1296,7 @@ DISPLAY
 		'step', 0.01,
 		'default', 1,
 		'current', DB.Scale,
-		'currentTextFunc', function(value) return sformat("%.1f",value) end,
+		'currentTextFunc', function(value) return sformat("%.1f", value) end,
 		'setFunc', function(value) DB.Scale = value TPTIcons:SetScale(DB.Scale) end)
 	scale:SetPoint("TOPLEFT", panel, "TOPLEFT", 25, -55)
 	scale:SetWidth(90)
@@ -1401,13 +1373,13 @@ OFFSETS
 		'description', 'X Offset.',
 		'minText', '',
 		'maxText', '',
-		'minValue', -100,
-		'maxValue', 100,
-		'step', 1,
-		'default', 0,
+		'minValue', -50,
+		'maxValue', 50,
+		'step', 0.01,
+		'default', 1,
 		'current', DB.OffX,
 		'setFunc', function(value) DB.OffX = value TPT:LoadPositions() end,
-		'currentTextFunc', function(value) return value end)
+		'currentTextFunc', function(value) return floor(value) end)
 	offsetX:SetPoint("TOP", left, "BOTTOM", 25, -30)
 	offsetX:SetWidth(SliderWidth)
 	panel.offsetX = offsetX
@@ -1417,13 +1389,13 @@ OFFSETS
 		'description', 'Y Offset.',
 		'minText', '',
 		'maxText', '',
-		'minValue', -100,
-		'maxValue', 100,
-		'step', 1,
-		'default', 0,
+		'minValue', -50,
+		'maxValue', 50,
+		'step', 0.01,
+		'default', 1,
 		'current', DB.OffY,
 		'setFunc', function(value) DB.OffY = value TPT:LoadPositions() end,
-		'currentTextFunc', function(value) return value end)
+		'currentTextFunc', function(value) return floor(value) end)
 	offsetY:SetPoint("LEFT", offsetX, "RIGHT", 20, 0)
 	offsetY:SetWidth(SliderWidth)
 	panel.offsetY = offsetY
