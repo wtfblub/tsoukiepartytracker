@@ -64,6 +64,7 @@ if ( GetBuildInfo() == "3.3.5" ) then
 end
 
 local anchors = {}
+local activeGUID = {}
 
 local validUnits = {
 	["player"] = 5,
@@ -472,7 +473,6 @@ function TPT:CreateAnchors()
 			anchor:SetMovable(true)
 			anchor:Show()
 			anchor.icons = {}
-			anchor.HideIcons = function() local icons = anchor.icons for i=1,#icons do local icon = icons[i] icon:Hide() icon.inUse = nil end end
 			anchor:SetScript("OnMouseDown",function(self,button) if button == "LeftButton" and not DB.Attach then self:StartMoving() end end)
 			anchor:SetScript("OnMouseUp",function(self,button) if button == "LeftButton" and not DB.Attach then self:StopMovingOrSizing() TPT:SavePositions() end end)
 			anchor:Hide()
@@ -483,6 +483,27 @@ function TPT:CreateAnchors()
 			index:SetPoint("CENTER")
 			index:SetText(i)
 	end
+end
+
+local function StartTime(Icon, Start)
+	local GUID = Icon.GUID
+	local AbilityName = Icon.ability
+	local Unit = activeGUID[GUID]
+
+	-- Unit
+	if ( not Unit ) then
+		Unit = {}
+		activeGUID[GUID] = Unit
+	end
+
+	-- Start
+	if ( Start ) then
+		Unit[AbilityName] = Start
+	else
+		Start = Unit[AbilityName]
+	end
+
+	return Unit, Start
 end
 
 local function CreateIcon(anchor)
@@ -497,8 +518,8 @@ local function CreateIcon(anchor)
 
 	icon.Start = function(sentCD)
 		if ( icon.inUse ) then
-			icon.starttime = GetTime()
-			CooldownFrame_Set(cd, icon.starttime, sentCD or icon.cooldown, 1)
+			local Unit, Start = StartTime(icon, GetTime())
+			CooldownFrame_Set(cd, Start, sentCD or icon.cooldown, 1)
 
 			if ( DB.Glow ) then
 				if ( not icon.flash ) then
@@ -517,19 +538,17 @@ local function CreateIcon(anchor)
 	end
 
 	icon.Stop = function()
-		if ( icon.starttime ) then
-			print("CD STOPPED!", icon.ability)
+		if ( icon.active ) then
 			CooldownFrame_Set(cd, 0, 0, 0)
-			icon.starttime = nil
 		end
 	end
 
-	icon.SetTimer = function(starttime, cooldown)
-		if ( starttime and cooldown ) then
-			CooldownFrame_Set(cd, starttime, cooldown, 1)
+	icon.SetTimer = function(starttime)
+		if ( starttime ) then
+			local Unit, Start = StartTime(icon, starttime)
+
+			CooldownFrame_Set(cd, Start, icon.cooldown, 1)
 			icon.active = true
-			icon.starttime = starttime
-			icon.cooldown = cooldown	
 		end
 	end
 
@@ -586,20 +605,20 @@ function TPT:ToggleAnchorDisplay()
 			local PartyMemberExist = UnitInParty("party"..i)
 
 			if ( not PartyMemberExist ) then
-				local Icons = anchor.icons
+				--[[local Icons = anchor.icons
 				local IconsNum = #Icons
 
 				if ( IconsNum > 0 ) then
-					for j=1, IconsNum do	
-						Icons[j].ability = nil	
-						Icons[j].seen = nil	
-						Icons[j].active = nil	
-						Icons[j].inUse = nil	
-						Icons[j].showing = nil	
+					for j=1, IconsNum do
+						local Icon = Icons[j]	
+						Icon.ability = nil	
+						Icon.seen = nil	
+						Icon.active = nil	
+						Icon.inUse = nil	
+						Icon.showing = nil
+						Icon:Hide()
 					end
-
-					anchor:HideIcons()
-				end
+				end]]
 
 				anchor:Hide()
 			else
@@ -621,7 +640,9 @@ function TPT:UpdateAnchor(Unit, i, PvPTrinket, TraceID)
 
 	local Anchor = anchors[i]
 	local Icons = Anchor.icons
+	local Icon
 	local Num = 1
+
 	local Time = GetTime()
 
 	Anchor.GUID = GUID
@@ -629,28 +650,32 @@ function TPT:UpdateAnchor(Unit, i, PvPTrinket, TraceID)
 	Anchor.race = Race
 
 	-- PvP Trinket
-	local TrinketID, TrinketCD, TrinketName = PvPTrinket[1], PvPTrinket[2], PvPTrinket[3]
-	_, Num = self:UpdateAnchorIcon(Anchor, Num, nil, Time, TrinketName, TrinketID, TrinketCD, TraceID)
-
-	if ( not DB.Trinket ) then
-		local Icon = Icons[1]
-		Icon.Stop()
-		Icon.showing = nil
-		Icon.inUse = nil
-	end
-
-	-- Racial
-	local Racial = DefaultRacial[Race]
-	if ( Racial ) then
-		local RacialID, RacialCD = Racial[1], Racial[2]
-		local RacialName = GetSpellInfo(RacialID)
-		_, Num = self:UpdateAnchorIcon(Anchor, Num, nil, Time, RacialName, RacialID, RacialCD, GetSpellTexture(RacialID))
-
-		if ( not DB.Racial ) then
-			local Icon = Icons[2]
+	if ( DB.Trinket ) then
+		local TrinketID, TrinketCD, TrinketName = PvPTrinket[1], PvPTrinket[2], PvPTrinket[3]
+		_, Num = self:UpdateAnchorIcon(Anchor, Num, nil, Time, TrinketName, TrinketID, TrinketCD, TraceID)
+	else
+		Icon = Icons[Num]
+		if ( Icon ) then
 			Icon.Stop()
 			Icon.showing = nil
 			Icon.inUse = nil
+		end
+	end
+
+	-- Racial
+	if ( DB.Racial ) then
+		local Racial = DefaultRacial[Race]
+		if ( Racial ) then
+			local RacialID, RacialCD = Racial[1], Racial[2]
+			local RacialName = GetSpellInfo(RacialID)
+			_, Num = self:UpdateAnchorIcon(Anchor, Num, nil, Time, RacialName, RacialID, RacialCD, GetSpellTexture(RacialID))
+		else
+			Icon = Icons[Num]
+			if ( Icon ) then
+				Icon.Stop()
+				Icon.showing = nil
+				Icon.inUse = nil
+			end
 		end
 	end
 
@@ -663,12 +688,11 @@ function TPT:UpdateAnchor(Unit, i, PvPTrinket, TraceID)
 
 	-- Icon Overflow
 	for i=Num,#Icons do
-		local Icon = Icons[i]
+		Icon = Icons[i]
 		Icon.seen = nil
 		Icon.active = nil
 		Icon.inUse = nil
 		Icon.showing = nil
-		Icon.starttime = nil
 	end
 
 	self:ToggleIconDisplay(i)
@@ -677,6 +701,8 @@ end
 function TPT:UpdateAnchorIcon(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 	local Icons = Anchor.icons
 	local Icon = Icons[Num] or TPT:AddIcon(Anchor)
+
+	Icon.GUID = Anchor.GUID
 
 	if ( Ability ) then
 		Name = Ability.ability
@@ -692,6 +718,16 @@ function TPT:UpdateAnchorIcon(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 	Icon.cooldown = CD
 	Icon.inUse = true
 	TPT:ApplyIconTextureBorder(Icon)
+
+	if ( Time ) then
+		local Unit, Start = StartTime(Icon)
+		if ( (Start and (Time - Start) < CD) ) then
+			Icon.SetTimer(Start, Icon.cooldown)
+		else
+			Icon.Stop()
+			Unit[Icon.ability] = nil
+		end
+	end
 
 	return Icon, (Num + 1)
 end
@@ -793,12 +829,11 @@ local function GROUP_ROSTER_UPDATE_DELAY()
 		if ( Anchor ) then
 			local UnitID = "party"..i
 
-			--if ( Anchor.GUID ~= UnitGUID(UnitID) ) then
-				-- Recheck spec, update unit, unit has changed!
+			if ( Anchor.GUID ~= UnitGUID(UnitID) ) then
 				TPT:TrinketCheck(UnitID, i)
 				Anchor.spec = nil
 				QuerySpec = 1
-			--end
+			end
 		else
 			break
 		end
@@ -806,6 +841,21 @@ local function GROUP_ROSTER_UPDATE_DELAY()
 
 	if ( QuerySpec ) then
 		TPT:LoadPositions()
+
+		-- Stale GUIDs
+		--[[for GUID in pairs(activeGUID) do
+			local Exists
+			for i=1,PARTY_NUM do
+				if ( GUID == UnitGUID("party"..i) ) then
+					Exists = 1
+					break
+				end
+			end
+			if ( not Exists ) then
+				print("TPT Removed GUID:", GUID)
+				activeGUID[GUID] = nil
+			end
+		end]]
 
 		INSPECT_CURRENT = nil
 		QUERY_SPEC_TICK_TIMEOUT = nil
@@ -839,7 +889,6 @@ function TPT:GROUP_ROSTER_UPDATE(Load)
 				TimerAfter(1.1, GROUP_ROSTER_UPDATE_DELAY)
 				GROUP_ROSTER_UPDATE_DELAY_QUEUED = 1
 			else
-				print("INSTANT")
 				GROUP_ROSTER_UPDATE_DELAY()
 			end
 		end
@@ -974,9 +1023,8 @@ function TPT:COMBAT_LOG_EVENT_UNFILTERED(...)
 		if ( Source and SourceID < 5 ) then
 			local Anchor = anchors[SourceID]
 
-			-- Classic: Buff is fired BEFORE cast event. Makes no sense, I know.
+			-- Classic: Buff is fired BEFORE cast event
 			-- Whitelist: Hex
-			-- TODO: Add NS to AURA_REMOVED
 			if ( CastEvent or (Event == "SPELL_AURA_APPLIED" and SpellName == HEX) ) then
 				self:StartCooldown(SpellName, Anchor)
 			elseif ( SpellType == "BUFF" ) then
