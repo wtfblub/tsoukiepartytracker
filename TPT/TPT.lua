@@ -1,3 +1,5 @@
+-- TODO: Unit death, update anchors
+
 local V = 7.55
 
 local Addon, Default = ...
@@ -537,8 +539,8 @@ local function CreateIcon(anchor)
 		end
 	end
 
-	icon.Stop = function()
-		if ( icon.active ) then
+	icon.Stop = function(Pass)
+		if ( icon.active or Pass ) then
 			CooldownFrame_Set(cd, 0, 0, 0)
 		end
 	end
@@ -597,45 +599,12 @@ function TPT:ApplyIconTextureBorder(icon)
 	end
 end
 
-function TPT:ToggleAnchorDisplay()
-	for i=1, 4 do
-		local anchor = anchors[i]
-
-		if ( anchor ) then
-			local PartyMemberExist = UnitInParty("party"..i)
-
-			if ( not PartyMemberExist ) then
-				--[[local Icons = anchor.icons
-				local IconsNum = #Icons
-
-				if ( IconsNum > 0 ) then
-					for j=1, IconsNum do
-						local Icon = Icons[j]	
-						Icon.ability = nil	
-						Icon.seen = nil	
-						Icon.active = nil	
-						Icon.inUse = nil	
-						Icon.showing = nil
-						Icon:Hide()
-					end
-				end]]
-
-				anchor:Hide()
-			else
-				anchor:Show()
-			end
-		end
-	end
-end
-
 function TPT:UpdateAnchor(Unit, i, PvPTrinket, TraceID)
 	if ( not self:IsShown() ) then return end
 
-	local GUID = UnitGUID(Unit)
-
-	if ( not GUID ) then return end
-
 	local _, Class = UnitClass(Unit)
+	if ( not Class ) then return end
+
 	local _, Race = UnitRace(Unit)
 
 	local Anchor = anchors[i]
@@ -645,7 +614,7 @@ function TPT:UpdateAnchor(Unit, i, PvPTrinket, TraceID)
 
 	local Time = GetTime()
 
-	Anchor.GUID = GUID
+	Anchor.GUID = UnitGUID(Unit)
 	Anchor.class = Class
 	Anchor.race = Race
 
@@ -657,7 +626,6 @@ function TPT:UpdateAnchor(Unit, i, PvPTrinket, TraceID)
 		Icon = Icons[Num]
 		if ( Icon ) then
 			Icon.Stop()
-			Icon.showing = nil
 			Icon.inUse = nil
 		end
 	end
@@ -673,26 +641,26 @@ function TPT:UpdateAnchor(Unit, i, PvPTrinket, TraceID)
 			Icon = Icons[Num]
 			if ( Icon ) then
 				Icon.Stop()
-				Icon.showing = nil
 				Icon.inUse = nil
 			end
 		end
 	end
 
 	-- All Spells
-	for Index, Ability in pairs(DB.Spells[Class]) do
-		if ( Ability.spellStatus ~= false and (not DefaultSpec[Ability.ability] or (Anchor.spec and Anchor.spec[Ability.ability])) ) then
-			_, Num = self:UpdateAnchorIcon(Anchor, Num, Ability, Time)
+	for Index, AbilityInfo in pairs(DB.Spells[Class]) do
+		local AbilityName = AbilityInfo.ability
+		local AnchorSpec = Anchor.spec
+
+		if ( AbilityInfo.spellStatus ~= false and (AnchorSpec and AnchorSpec[AbilityName] or not DefaultSpec[AbilityName]) ) then
+			_, Num = self:UpdateAnchorIcon(Anchor, Num, AbilityInfo, Time)
 		end
 	end
 
 	-- Icon Overflow
 	for i=Num,#Icons do
 		Icon = Icons[i]
-		Icon.seen = nil
 		Icon.active = nil
 		Icon.inUse = nil
-		Icon.showing = nil
 	end
 
 	self:ToggleIconDisplay(i)
@@ -701,8 +669,6 @@ end
 function TPT:UpdateAnchorIcon(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 	local Icons = Anchor.icons
 	local Icon = Icons[Num] or TPT:AddIcon(Anchor)
-
-	Icon.GUID = Anchor.GUID
 
 	if ( Ability ) then
 		Name = Ability.ability
@@ -717,6 +683,7 @@ function TPT:UpdateAnchorIcon(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 	Icon.abilityID = ID
 	Icon.cooldown = CD
 	Icon.inUse = true
+	Icon.GUID = Anchor.GUID
 	TPT:ApplyIconTextureBorder(Icon)
 
 	if ( Time ) then
@@ -741,15 +708,7 @@ function TPT:ToggleIconDisplay(i)
 
 	-- hiding all icons before anchoring and deciding whether to show them
 	for k, icon in pairs(icons) do
-		if icon and icon.ability and icon.inUse then
-			if icon.spec then
-				icon.showing = (not DB.Hidden and icon.seen) or (DB.Hidden and icon.active)
-			else
-				icon.showing = (icon.active or not DB.Hidden)
-			end
-		end
-
-		if icon and icon.ability and icon.showing then
+		if icon and icon.ability and icon.inUse and (icon.active or not DB.Hidden) then
 			icon:ClearAllPoints()
 
 			if DB.Rows then
@@ -775,8 +734,6 @@ function TPT:ToggleIconDisplay(i)
 			icon:Hide()
 		end
 	end
-
-	self:ToggleAnchorDisplay() 	
 end
 
 function TPT:TrinketCheck(Unit, i)
@@ -820,19 +777,25 @@ function TPT:UpdateAllAnchorIcons()
 	end
 end
 
-local function GROUP_ROSTER_UPDATE_DELAY()
+local function GROUP_ROSTER_UPDATE_DELAY(Reset)
 	local QuerySpec
 
-	for i=1, PARTY_NUM do
+	for i=1, 4 do
 		local Anchor = anchors[i]
 
 		if ( Anchor ) then
-			local UnitID = "party"..i
+			if ( i <= PARTY_NUM ) then
+				local UnitID = "party"..i
 
-			if ( Anchor.GUID ~= UnitGUID(UnitID) ) then
-				TPT:TrinketCheck(UnitID, i)
-				Anchor.spec = nil
-				QuerySpec = 1
+				if ( Reset or (not Anchor.spec) or (Anchor.GUID ~= UnitGUID(UnitID)) or (UnitIsDead(UnitID) and Anchor.spec) ) then
+					TPT:TrinketCheck(UnitID, i)
+					Anchor:Show()
+					Anchor.spec = nil
+					QuerySpec = 1
+				end
+			else
+				TPT:StopAllIcons(i, true)
+				Anchor:Hide()
 			end
 		else
 			break
@@ -840,10 +803,8 @@ local function GROUP_ROSTER_UPDATE_DELAY()
 	end
 
 	if ( QuerySpec ) then
-		TPT:LoadPositions()
-
 		-- Stale GUIDs
-		--[[for GUID in pairs(activeGUID) do
+		for GUID in pairs(activeGUID) do
 			local Exists
 			for i=1,PARTY_NUM do
 				if ( GUID == UnitGUID("party"..i) ) then
@@ -852,10 +813,11 @@ local function GROUP_ROSTER_UPDATE_DELAY()
 				end
 			end
 			if ( not Exists ) then
-				print("TPT Removed GUID:", GUID)
 				activeGUID[GUID] = nil
 			end
-		end]]
+		end
+
+		TPT:LoadPositions()
 
 		INSPECT_CURRENT = nil
 		QUERY_SPEC_TICK_TIMEOUT = nil
@@ -884,12 +846,16 @@ function TPT:GROUP_ROSTER_UPDATE(Load)
 		-- Our party has changed size, lets re-check spec.
 		-- 3.3.5: This fires when we leave group, idk how to avoid.
 		if ( PARTY_NUM > 0 and (PartyChanged or CURRENT_ZONE_TYPE ~= PREVIOUS_ZONE_TYPE) ) then -- Dynamic updating.
-			if ( INSPECT_READY == "INSPECT_READY" and not GROUP_ROSTER_UPDATE_DELAY_QUEUED ) then
-				-- Classic, delay update.
-				TimerAfter(1.1, GROUP_ROSTER_UPDATE_DELAY)
+			if ( not GROUP_ROSTER_UPDATE_DELAY_QUEUED ) then
 				GROUP_ROSTER_UPDATE_DELAY_QUEUED = 1
-			else
-				GROUP_ROSTER_UPDATE_DELAY()
+
+				if ( INSPECT_READY == "INSPECT_READY" ) then
+					-- Classic
+					TimerAfter(1, GROUP_ROSTER_UPDATE_DELAY)
+				else
+					-- 3.3.5
+					GROUP_ROSTER_UPDATE_DELAY()
+				end
 			end
 		end
 	end
@@ -975,7 +941,6 @@ function TPT:StartCooldown(SpellName, Anchor)
 		local Icon = Anchor.icons[i]
 
 		if ( Icon.ability == SpellName ) then
-			Icon.seen = true
 			Icon.Start()
 		else
 			-- Undead Racial <-> PvP Trinket (45s)
@@ -1066,15 +1031,22 @@ function TPT:ApplySettings()
 	end
 end
 
-function TPT:StopAllIcons()
-	local Anchors = #anchors
-	for i=1, Anchors do
+function TPT:StopAllIcons(AnchorID, Reset)
+	for i=(AnchorID or 1), (AnchorID or #anchors) do
 		local Icons = anchors[i].icons
 
 		for k=1, #Icons do
 			local Icon = Icons[k]
-			Icon.Stop()
-			Icon.seen = nil
+
+			Icon.active = nil
+
+			if ( Reset ) then
+				Icon.ability = nil
+				Icon.inUse = nil
+				Icon:Hide()
+			else
+				Icon.Stop(true)
+			end
 		end
 	end
 end
