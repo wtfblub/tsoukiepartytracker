@@ -550,14 +550,15 @@ local function CreateIcon(anchor)
 	end
 
 	icon.Stop = function()
-		if ( icon.active ) then
-			local Unit = activeGUID[icon.GUID]
-			if ( Unit ) then
-				local Ability = icon.ability
-				if ( Unit[Ability] ) then
-					CooldownFrame_Set(cd, 0, 0, 0)
-					Unit[Ability] = nil
-				end
+		local Ability = icon.ability
+		local ActiveUnit = activeGUID[icon.GUID]
+		local ActiveAbility = ActiveUnit and ActiveUnit[Ability]
+
+		if ( icon.active or ActiveAbility ) then
+			CooldownFrame_Set(cd, 0, 0, 0)
+
+			if ( ActiveAbility ) then
+				ActiveUnit[Ability] = nil
 			end
 		end
 	end
@@ -700,6 +701,7 @@ function TPT:ToggleIconDisplay(i)
 	local Anchor = anchors[i]
 	local Icons = Anchor.icons
 	local LastIndex = 0
+	local Count = 0
 	local Time = GetTime()
 
 	for Index=1,#Icons do
@@ -714,15 +716,15 @@ function TPT:ToggleIconDisplay(i)
 			Icon:ClearAllPoints()
 
 			if DB.Rows then
-				if ( Index == 1 ) then
+				if ( Count == 1 ) then
 					Icon:SetPoint(DB.Left and "TOPRIGHT" or "TOPLEFT", Anchor, DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", DB.Left and -1 * DB.SpaceX or DB.SpaceX, 0)
-				elseif ( Index % 2 == 0 ) then
+				elseif ( Count % 2 == 0 ) then
 					Icon:SetPoint(DB.Left and "TOP" or "TOP", Icons[LastIndex], DB.Left and "BOTTOM" or "BOTTOM", DB.Left and 0 or 0, -1 * DB.SpaceY )			
 				else
 					Icon:SetPoint(DB.Left and "BOTTOMRIGHT" or "BOTTOMLEFT", Icons[LastIndex], DB.Left and "TOPLEFT" or "TOPRIGHT", DB.Left and -1 * DB.SpaceX  or DB.SpaceX, DB.SpaceY)
 				end
 			else
-				if ( Index == 1 ) then	
+				if ( Count == 1 ) then	
 					Icon:SetPoint(DB.Left and "TOPRIGHT" or "TOPLEFT", Anchor, DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", DB.Left and -1 * DB.SpaceX or DB.SpaceX, 0)
 				else
 					Icon:SetPoint(DB.Left and "RIGHT" or "LEFT", Icons[LastIndex], DB.Left and "LEFT" or "RIGHT", DB.Left and -1 * DB.SpaceX or DB.SpaceX, 0)
@@ -730,6 +732,7 @@ function TPT:ToggleIconDisplay(i)
 			end
 
 			LastIndex = Index
+			Count = Count + 1
 			Icon:Show()
 		else
 			Icon:Hide()
@@ -775,7 +778,7 @@ local function GROUP_ROSTER_UPDATE_DELAY()
 			if ( i <= PARTY_NUM ) then
 				local UnitGUID = UnitGUID(Anchor.unit)
 
-				if ( (UnitGUID and not Anchor.spec and not INSPECT_CURRENT) or (Anchor.GUID and Anchor.GUID ~= UnitGUID) ) then
+				if ( (UnitGUID and not Anchor.spec and not INSPECT_CURRENT) or (Anchor.GUID ~= UnitGUID) ) then
 					Anchor.spec = nil
 					TPT:UpdateAnchor(i)
 					QuerySpec = 1
