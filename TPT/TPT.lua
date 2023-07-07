@@ -1,5 +1,3 @@
--- TODO: Unit death, update anchors
-
 local V = 7.55
 
 local Addon, Default = ...
@@ -312,7 +310,7 @@ function TPT:QuerySpecInfo()
 				anchor.spec = nil
 			else
 				-- Update with new spec.
-				TPT:TrinketCheck("party"..INSPECT_CURRENT, INSPECT_CURRENT)
+				TPT:UpdateAnchor(INSPECT_CURRENT)
 			end
 
 			if ( INSPECT_CURRENT == PARTY_NUM ) then
@@ -331,7 +329,7 @@ function TPT:QuerySpecInfo()
 			local anchor = anchors[i]
 			if not anchor then return end
 
-			local unit = "party"..i
+			local unit = anchor.unit
 
 			if ( not anchor.spec ) then
 				if ( UnitIsConnected(unit) ) then
@@ -376,7 +374,6 @@ local function HideGlow(Icon)
 	end
 end
 
--- Disable all this in a bigger raid.
 function TPT:FindCompactRaidFrameByUnit(Unit)
 	local UnitIDGUID = UnitGUID(Unit)
 
@@ -434,12 +431,12 @@ function TPT:FindCompactRaidFrameByUnit(Unit)
 	end
 end
 
-function TPT:LoadPositions()
+function TPT:UpdateAnchorPosition()
 	if ( PARTY_NUM > 0 and ENABLED ) then
 		for i=1, PARTY_NUM do
 			local anchor = anchors[i]
 
-			anchor:ClearAllPoints() -- COMPAT
+			anchor:ClearAllPoints()
 
 			local frame
 			if ( DB.Attach ) then
@@ -468,20 +465,32 @@ end
 
 function TPT:CreateAnchors()
 	for i=1,4 do
-		local anchor = CreateFrame("Frame","TPTAnchor"..i , TPTAnchor)
-			anchor:SetHeight(15)
-			anchor:SetWidth(15)
-			anchor:EnableMouse(true)
-			anchor:SetMovable(true)
-			anchor:Show()
-			anchor.icons = {}
-			anchor:SetScript("OnMouseDown",function(self,button) if button == "LeftButton" and not DB.Attach then self:StartMoving() end end)
-			anchor:SetScript("OnMouseUp",function(self,button) if button == "LeftButton" and not DB.Attach then self:StopMovingOrSizing() TPT:SavePositions() end end)
-			anchor:Hide()
-			anchors[i] = anchor
-			anchor.i = i
+		local Anchor = CreateFrame("Frame", "TPTAnchor"..i, TPTAnchor)
+			Anchor:SetHeight(15)
+			Anchor:SetWidth(15)
+			Anchor:EnableMouse(true)
+			Anchor:SetMovable(true)
+			Anchor:Hide()
 
-		local index = anchor:CreateFontString(nil,"ARTWORK","GameFontNormal")
+			Anchor:SetScript("OnMouseDown", function(self,button)
+				if button == "LeftButton" and not DB.Attach then
+					self:StartMoving()
+				end
+			end)
+			Anchor:SetScript("OnMouseUp", function(self,button)
+				if button == "LeftButton" and not DB.Attach then
+					self:StopMovingOrSizing()
+					TPT:SavePositions()
+				end 
+			end)
+
+			Anchor.i = i
+			Anchor.unit = "party"..i
+			Anchor.icons = {}
+
+			anchors[i] = Anchor
+
+		local index = Anchor:CreateFontString(nil,"ARTWORK","GameFontNormal")
 			index:SetPoint("CENTER")
 			index:SetText(i)
 	end
@@ -519,7 +528,7 @@ local function CreateIcon(anchor)
 	icon.texture = texture
 
 	icon.Start = function(sentCD)
-		if ( icon.inUse ) then
+		if ( icon.ability ) then
 			local Unit, Start = StartTime(icon, GetTime())
 			CooldownFrame_Set(cd, Start, sentCD or icon.cooldown, 1)
 
@@ -530,34 +539,32 @@ local function CreateIcon(anchor)
 				icon.flash.D:Play()
 			end
 
-			icon:Show()
 			icon.active = true
 
 			if ( DB.Hidden ) then
 				TPT:ToggleIconDisplay(anchor.i)
+			else
+				icon:Show()
 			end
 		end
 	end
 
-	icon.Stop = function(Pass)
-		if ( icon.active or Pass ) then
-			CooldownFrame_Set(cd, 0, 0, 0)
-		end
-	end
-
-	icon.SetTimer = function(starttime)
-		if ( starttime ) then
-			local Unit, Start = StartTime(icon, starttime)
-
-			CooldownFrame_Set(cd, Start, icon.cooldown, 1)
-			icon.active = true
+	icon.Stop = function()
+		if ( icon.active ) then
+			local Unit = activeGUID[icon.GUID]
+			if ( Unit ) then
+				local Ability = icon.ability
+				if ( Unit[Ability] ) then
+					CooldownFrame_Set(cd, 0, 0, 0)
+					Unit[Ability] = nil
+				end
+			end
 		end
 	end
 
 	cd:HookScript("OnHide",function()
-		icon.active = nil
-
 		HideGlow(icon)
+		icon.active = nil
 
 		if ( DB.Hidden ) then
 			TPT:ToggleIconDisplay(anchor.i)
@@ -566,7 +573,7 @@ local function CreateIcon(anchor)
 
 	TPT:ApplyIconTextureBorder(icon)
 
-	-- Tooltips
+	-- Tooltip
 	icon:EnableMouse()
 	icon:SetScript("OnEnter", function()
 		if ( DB.Tooltip and icon.abilityID ) then
@@ -579,16 +586,17 @@ local function CreateIcon(anchor)
 			GameTooltip:Hide()
 		end
 	end)
+
 	return icon
 end
 
-function TPT:AddIcon(anchor)
-	local icons = anchor.icons
+function TPT:AddIcon(Anchor)
+	local Icons = Anchor.icons
 
-	local newicon = CreateIcon(anchor)
-	icons[#icons+1] = newicon
+	local Creation = CreateIcon(Anchor)
+	Icons[#Icons+1] = Creation
 
-	return newicon
+	return Creation
 end
 
 function TPT:ApplyIconTextureBorder(icon)
@@ -599,34 +607,34 @@ function TPT:ApplyIconTextureBorder(icon)
 	end
 end
 
-function TPT:UpdateAnchor(Unit, i, PvPTrinket, TraceID)
-	if ( not self:IsShown() ) then return end
+function TPT:UpdateAnchor(i)
+	local Anchor = anchors[i]
+	local Unit = Anchor.unit
 
 	local _, Class = UnitClass(Unit)
 	if ( not Class ) then return end
 
 	local _, Race = UnitRace(Unit)
 
-	local Anchor = anchors[i]
 	local Icons = Anchor.icons
 	local Icon
 	local Num = 1
-
-	local Time = GetTime()
 
 	Anchor.GUID = UnitGUID(Unit)
 	Anchor.class = Class
 	Anchor.race = Race
 
 	-- PvP Trinket
+	local PvPTrinket = (Race == "Human") and DefaultTrinket[2] or DefaultTrinket[1]
 	if ( DB.Trinket ) then
+		local PvPTrinketIcon = (PLAYER_FACTION == "Alliance") and TRINKET_ALLIANCE or TRINKET_HORDE
 		local TrinketID, TrinketCD, TrinketName = PvPTrinket[1], PvPTrinket[2], PvPTrinket[3]
-		_, Num = self:UpdateAnchorIcon(Anchor, Num, nil, Time, TrinketName, TrinketID, TrinketCD, TraceID)
+		_, Num = self:UpdateAnchorIcon(Anchor, Num, nil, TrinketName, TrinketID, TrinketCD, PvPTrinketIcon)
 	else
 		Icon = Icons[Num]
-		if ( Icon ) then
+		if ( Icon and Icon.ability == PvPTrinket[3] ) then
 			Icon.Stop()
-			Icon.inUse = nil
+			Icon.ability = nil
 		end
 	end
 
@@ -636,13 +644,13 @@ function TPT:UpdateAnchor(Unit, i, PvPTrinket, TraceID)
 		if ( Racial ) then
 			local RacialID, RacialCD = Racial[1], Racial[2]
 			local RacialName = GetSpellInfo(RacialID)
-			_, Num = self:UpdateAnchorIcon(Anchor, Num, nil, Time, RacialName, RacialID, RacialCD, GetSpellTexture(RacialID))
-		else
-			Icon = Icons[Num]
-			if ( Icon ) then
-				Icon.Stop()
-				Icon.inUse = nil
-			end
+			_, Num = self:UpdateAnchorIcon(Anchor, Num, nil, RacialName, RacialID, RacialCD, GetSpellTexture(RacialID))
+		end
+	else
+		Icon = Icons[Num]
+		if ( Icon and Icon.abilityID == Racial[1] ) then
+			Icon.Stop()
+			Icon.ability = nil
 		end
 	end
 
@@ -652,7 +660,7 @@ function TPT:UpdateAnchor(Unit, i, PvPTrinket, TraceID)
 		local AnchorSpec = Anchor.spec
 
 		if ( AbilityInfo.spellStatus ~= false and (AnchorSpec and AnchorSpec[AbilityName] or not DefaultSpec[AbilityName]) ) then
-			_, Num = self:UpdateAnchorIcon(Anchor, Num, AbilityInfo, Time)
+			_, Num = self:UpdateAnchorIcon(Anchor, Num, AbilityInfo)
 		end
 	end
 
@@ -660,13 +668,13 @@ function TPT:UpdateAnchor(Unit, i, PvPTrinket, TraceID)
 	for i=Num,#Icons do
 		Icon = Icons[i]
 		Icon.active = nil
-		Icon.inUse = nil
+		Icon.ability = nil
 	end
 
 	self:ToggleIconDisplay(i)
 end
 
-function TPT:UpdateAnchorIcon(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
+function TPT:UpdateAnchorIcon(Anchor, Num, Ability, Name, ID, CD, Texture)
 	local Icons = Anchor.icons
 	local Icon = Icons[Num] or TPT:AddIcon(Anchor)
 
@@ -682,91 +690,71 @@ function TPT:UpdateAnchorIcon(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 	Icon.ability = Name
 	Icon.abilityID = ID
 	Icon.cooldown = CD
-	Icon.inUse = true
 	Icon.GUID = Anchor.GUID
 	TPT:ApplyIconTextureBorder(Icon)
-
-	if ( Time ) then
-		local Unit, Start = StartTime(Icon)
-		if ( (Start and (Time - Start) < CD) ) then
-			Icon.SetTimer(Start, Icon.cooldown)
-		else
-			Icon.Stop()
-			Unit[Icon.ability] = nil
-		end
-	end
 
 	return Icon, (Num + 1)
 end
 
--- responsible for actual anchoring of icons
 function TPT:ToggleIconDisplay(i)
-	local anchor = anchors[i]
-	local icons = anchor.icons
-	local count = 1
-	local lastActiveIndex = 0
+	local Anchor = anchors[i]
+	local Icons = Anchor.icons
+	local LastIndex = 0
+	local Time = GetTime()
 
-	-- hiding all icons before anchoring and deciding whether to show them
-	for k, icon in pairs(icons) do
-		if icon and icon.ability and icon.inUse and (icon.active or not DB.Hidden) then
-			icon:ClearAllPoints()
+	for Index=1,#Icons do
+		local Icon = Icons[Index]
+		local _, Start
+
+		if ( DB.Hidden and not Icon.active ) then
+			_, Start = StartTime(Icon)
+		end
+
+		if ( Icon and Icon.ability and (not DB.Hidden or Icon.active or (Start and (Time - Start) < Icon.cooldown)) ) then
+			Icon:ClearAllPoints()
 
 			if DB.Rows then
-				if count == 1 then
-					icon:SetPoint(DB.Left and "TOPRIGHT" or "TOPLEFT", anchor, DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", DB.Left and -1 * DB.SpaceX or DB.SpaceX, 0)
-				elseif  (count % 2 == 0 )  then				
-					icon:SetPoint(DB.Left and "TOP" or "TOP", icons[lastActiveIndex], DB.Left and "BOTTOM" or "BOTTOM", DB.Left and 0 or 0, -1 * DB.SpaceY )			
-				else	
-					icon:SetPoint(DB.Left and "BOTTOMRIGHT" or "BOTTOMLEFT", icons[lastActiveIndex], DB.Left and "TOPLEFT" or "TOPRIGHT", DB.Left and -1 * DB.SpaceX  or DB.SpaceX, DB.SpaceY)
-				end	
+				if ( Index == 1 ) then
+					Icon:SetPoint(DB.Left and "TOPRIGHT" or "TOPLEFT", Anchor, DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", DB.Left and -1 * DB.SpaceX or DB.SpaceX, 0)
+				elseif ( Index % 2 == 0 ) then
+					Icon:SetPoint(DB.Left and "TOP" or "TOP", Icons[LastIndex], DB.Left and "BOTTOM" or "BOTTOM", DB.Left and 0 or 0, -1 * DB.SpaceY )			
+				else
+					Icon:SetPoint(DB.Left and "BOTTOMRIGHT" or "BOTTOMLEFT", Icons[LastIndex], DB.Left and "TOPLEFT" or "TOPRIGHT", DB.Left and -1 * DB.SpaceX  or DB.SpaceX, DB.SpaceY)
+				end
 			else
-				if count == 1  then	
-					icon:SetPoint(DB.Left and "TOPRIGHT" or "TOPLEFT", anchor, DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", DB.Left and -1 * DB.SpaceX or DB.SpaceX, 0)
-				else	
-					icon:SetPoint(DB.Left and "RIGHT" or "LEFT", icons[lastActiveIndex], DB.Left and "LEFT" or "RIGHT", DB.Left and -1 * DB.SpaceX or DB.SpaceX, 0)
+				if ( Index == 1 ) then	
+					Icon:SetPoint(DB.Left and "TOPRIGHT" or "TOPLEFT", Anchor, DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", DB.Left and -1 * DB.SpaceX or DB.SpaceX, 0)
+				else
+					Icon:SetPoint(DB.Left and "RIGHT" or "LEFT", Icons[LastIndex], DB.Left and "LEFT" or "RIGHT", DB.Left and -1 * DB.SpaceX or DB.SpaceX, 0)
 				end
 			end
 
-			lastActiveIndex = k	
-			count = count + 1	
-			icon:Show()
+			LastIndex = Index
+			Icon:Show()
 		else
-			icon:Hide()
+			Icon:Hide()
 		end
 	end
-end
-
-function TPT:TrinketCheck(Unit, i)
-	local Trinket = DefaultTrinket[1]
-	local Icon
-
-	if ( PLAYER_FACTION == "Alliance" ) then
-		local _, Race = UnitRace(Unit)
-		if ( Race == "Human" ) then
-			Trinket = DefaultTrinket[2]
-		end
-
-		Icon = TRINKET_ALLIANCE
-	else
-		Icon = TRINKET_HORDE
-	end
-
-	self:UpdateAnchor(Unit, i, Trinket, Icon)
 end
 
 function TPT:UpdateAllAnchors()
 	if ( PARTY_NUM > 0 and ENABLED ) then
+		local Anchor
+
 		for i=1, PARTY_NUM do
-			local Unit = "party"..i
-			local _, Class = UnitClass(Unit)
+			Anchor = anchors[i]
 
-			if ( not Class or not anchors[i] ) then break end
+			if ( Anchor ) then
+				self:UpdateAnchor(i)
+			else
+				break
+			end
+		end
 
-			self:TrinketCheck(Unit, i)
+		if ( Anchor ) then
+			self:UpdateAnchorPosition()
 		end
 	end
-
-	self:LoadPositions()
 end
 
 function TPT:UpdateAllAnchorIcons()
@@ -777,7 +765,7 @@ function TPT:UpdateAllAnchorIcons()
 	end
 end
 
-local function GROUP_ROSTER_UPDATE_DELAY(Reset)
+local function GROUP_ROSTER_UPDATE_DELAY()
 	local QuerySpec
 
 	for i=1, 4 do
@@ -785,17 +773,23 @@ local function GROUP_ROSTER_UPDATE_DELAY(Reset)
 
 		if ( Anchor ) then
 			if ( i <= PARTY_NUM ) then
-				local UnitID = "party"..i
+				local UnitGUID = UnitGUID(Anchor.unit)
 
-				if ( Reset or (not Anchor.spec) or (Anchor.GUID ~= UnitGUID(UnitID)) or (UnitIsDead(UnitID) and Anchor.spec) ) then
-					TPT:TrinketCheck(UnitID, i)
-					Anchor:Show()
+				if ( (UnitGUID and not Anchor.spec and not INSPECT_CURRENT) or (Anchor.GUID and Anchor.GUID ~= UnitGUID) ) then
 					Anchor.spec = nil
+					TPT:UpdateAnchor(i)
 					QuerySpec = 1
+				elseif ( not Anchor.active ) then
+					TPT:ToggleIconDisplay(i)
 				end
-			else
-				TPT:StopAllIcons(i, true)
+
+				Anchor:Show()
+				Anchor.active = 1
+			elseif ( Anchor.active ) then
 				Anchor:Hide()
+				Anchor.active = nil
+
+				TPT:StopAllIcons(i, true)
 			end
 		else
 			break
@@ -803,21 +797,14 @@ local function GROUP_ROSTER_UPDATE_DELAY(Reset)
 	end
 
 	if ( QuerySpec ) then
-		-- Stale GUIDs
+		-- Cleanse Stale GUIDs
 		for GUID in pairs(activeGUID) do
-			local Exists
-			for i=1,PARTY_NUM do
-				if ( GUID == UnitGUID("party"..i) ) then
-					Exists = 1
-					break
-				end
-			end
-			if ( not Exists ) then
+			if ( not TPT:GetUnitByGUID(GUID) ) then
 				activeGUID[GUID] = nil
 			end
 		end
 
-		TPT:LoadPositions()
+		TPT:UpdateAnchorPosition()
 
 		INSPECT_CURRENT = nil
 		QUERY_SPEC_TICK_TIMEOUT = nil
@@ -827,7 +814,7 @@ local function GROUP_ROSTER_UPDATE_DELAY(Reset)
 	GROUP_ROSTER_UPDATE_DELAY_QUEUED = nil
 end
 
-function TPT:GROUP_ROSTER_UPDATE(Load)
+function TPT:GROUP_ROSTER_UPDATE(ZoneChanged)
 	local GroupSize = GetNumGroupMembers()
 	if ( IsInRaid() ) then
 		GroupSize = GroupSize - 1
@@ -838,25 +825,18 @@ function TPT:GROUP_ROSTER_UPDATE(Load)
 
 	local PartyChanged = PARTY_NUM ~= PARTY_NUM_PREVIOUS
 
-	if ( PartyChanged or Load ) then
+	if ( PartyChanged or ZoneChanged ) then
 		self:ApplySettings()
 	end
 
-	if ( ENABLED and ValidZoneType() ) then
-		-- Our party has changed size, lets re-check spec.
-		-- 3.3.5: This fires when we leave group, idk how to avoid.
-		if ( PARTY_NUM > 0 and (PartyChanged or CURRENT_ZONE_TYPE ~= PREVIOUS_ZONE_TYPE) ) then -- Dynamic updating.
+	if ( ValidZoneType() ) then
+		if ( PartyChanged or CURRENT_ZONE_TYPE ~= PREVIOUS_ZONE_TYPE ) then
 			if ( not GROUP_ROSTER_UPDATE_DELAY_QUEUED ) then
+				TimerAfter(1, GROUP_ROSTER_UPDATE_DELAY)
 				GROUP_ROSTER_UPDATE_DELAY_QUEUED = 1
-
-				if ( INSPECT_READY == "INSPECT_READY" ) then
-					-- Classic
-					TimerAfter(1, GROUP_ROSTER_UPDATE_DELAY)
-				else
-					-- 3.3.5
-					GROUP_ROSTER_UPDATE_DELAY()
-				end
 			end
+
+			PREVIOUS_ZONE_TYPE = CURRENT_ZONE_TYPE
 		end
 	end
 end
@@ -866,7 +846,6 @@ function TPT:PARTY_MEMBERS_CHANGED()
 end
 
 function TPT:PLAYER_ENTERING_WORLD()
-	-- Player faction, cause merc on Warmane.
 	PLAYER_FACTION = UnitFactionGroup("player")
 
 	local _
@@ -890,17 +869,9 @@ function TPT:PLAYER_ENTERING_WORLD()
 	end
 end
 
-function TPT:FindAbilityByName(abilities, name)
-	if abilities then
-		for i, v in pairs(abilities) do
-			if v and v.ability and v.ability == name then return v, i end
-		end
-	end
-end
-
-function TPT:GetUnitByGUID(guid)
+function TPT:GetUnitByGUID(GUID)
 	for k,v in pairs(validUnits) do
-		if UnitGUID(k) == guid then
+		if UnitGUID(k) == GUID then
 			return k, v
 		end
 	end
@@ -1007,45 +978,39 @@ end
 function TPT:ApplySettings()
 	if ( ValidZoneType() and PARTY_NUM > 0 ) then
 		if ( not ENABLED ) then
+			ENABLED = 1
+
 			TPTIcons:Show()
 			self:Show()
 			self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-			ENABLED = 1
 
 			if ( not DB.Lock ) then
 				TPTAnchor:Show()
 			end
 		end
 	elseif ( ENABLED ) then
-		if ( PARTY_NUM == 0 and CURRENT_ZONE_TYPE ~= "arena" ) then
-			self:StopAllIcons()
-		end
+		ENABLED = nil
 
 		TPTIcons:Hide()
 		self:Hide()
 		self:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 		QUERY_SPEC_STOP()
-		ENABLED = nil
 
 		TPTAnchor:Hide()
 	end
 end
 
-function TPT:StopAllIcons(AnchorID, Reset)
+function TPT:StopAllIcons(AnchorID, Hide)
 	for i=(AnchorID or 1), (AnchorID or #anchors) do
 		local Icons = anchors[i].icons
 
 		for k=1, #Icons do
 			local Icon = Icons[k]
 
-			Icon.active = nil
-
-			if ( Reset ) then
-				Icon.ability = nil
-				Icon.inUse = nil
+			if ( Hide ) then
 				Icon:Hide()
 			else
-				Icon.Stop(true)
+				Icon.Stop()
 			end
 		end
 	end
@@ -1093,6 +1058,14 @@ end
 -------------------------------------------------------------
 -- Panel
 -------------------------------------------------------------
+
+local function FindAbilityByName(abilities, name)
+	if abilities then
+		for i, v in pairs(abilities) do
+			if v and v.ability and v.ability == name then return v, i end
+		end
+	end
+end
 
 local function ListButtonOnClick(self)
 	self:GetParent().currentButton = self.index
@@ -1281,7 +1254,7 @@ ALIGN
 		'setFunc', function(value)
 			DB.Attach = value
 			AttachToggle(panel)
-			TPT:LoadPositions()
+			TPT:UpdateAnchorPosition()
 		end)
 	attach:SetPoint("TOPLEFT", panel, "TOPLEFT", 330, -10)
 
@@ -1366,7 +1339,7 @@ DISPLAY
 		'description', 'Show icons under attached frame.',
 		'default', false,
 		'getFunc', function() return DB.Horiz end,
-		'setFunc', function(value) DB.Horiz = value TPT:LoadPositions() end)
+		'setFunc', function(value) DB.Horiz = value TPT:UpdateAnchorPosition() end)
 	horiz:SetPoint("LEFT", rows, "RIGHT", CheckOffsetX + 20, 0)
 	panel.horiz = horiz
 
@@ -1394,7 +1367,7 @@ OFFSETS
 		'step', 0.01,
 		'default', 1,
 		'current', DB.OffX,
-		'setFunc', function(value) DB.OffX = value TPT:LoadPositions() end,
+		'setFunc', function(value) DB.OffX = value TPT:UpdateAnchorPosition() end,
 		'currentTextFunc', function(value) return floor(value) end)
 	offsetX:SetPoint("TOP", left, "BOTTOM", 25, -30)
 	offsetX:SetWidth(SliderWidth)
@@ -1410,7 +1383,7 @@ OFFSETS
 		'step', 0.01,
 		'default', 1,
 		'current', DB.OffY,
-		'setFunc', function(value) DB.OffY = value TPT:LoadPositions() end,
+		'setFunc', function(value) DB.OffY = value TPT:UpdateAnchorPosition() end,
 		'currentTextFunc', function(value) return floor(value) end)
 	offsetY:SetPoint("LEFT", offsetX, "RIGHT", 20, 0)
 	offsetY:SetWidth(SliderWidth)
@@ -1667,7 +1640,7 @@ function TPT:CreateAbilityEditor()
 						SettingsPrint("Added/Updated", SpellName)
 
 						local Abilities = DB.Spells[DB.SelClass]
-						local AbilityNameExist, AbilityIndexExist = self:FindAbilityByName(Abilities, SpellName)
+						local AbilityNameExist, AbilityIndexExist = FindAbilityByName(Abilities, SpellName)
 
 						-- Updated/New Data
 						local Data = {}
@@ -1709,7 +1682,7 @@ function TPT:CreateAbilityEditor()
 		'description', 'Remove Ability',
 		'func', function()
 			local SpellName = GetSpellInfo(ideditbox:GetText())
-			local AbilityNameExist, AbilityIndexExist = self:FindAbilityByName(DB.Spells[DB.SelClass], SpellName)
+			local AbilityNameExist, AbilityIndexExist = FindAbilityByName(DB.Spells[DB.SelClass], SpellName)
 
 			if ( AbilityNameExist and AbilityIndexExist ) then
 				remove(DB.Spells[DB.SelClass], AbilityIndexExist)
