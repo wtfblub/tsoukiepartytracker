@@ -266,6 +266,7 @@ local function IconSet(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 
 	local StartTime = Active(Icon)
 	if ( (StartTime and (Time - StartTime) < CD) ) then
+		GlowHide(Icon)
 		CooldownFrame_Set(Icon.Swipe, StartTime, CD, 1)
 		Icon.Active = 1
 	elseif ( Icon.Active ) then
@@ -410,27 +411,27 @@ local function AnchorOnMouseUp(Self, Button)
 	end
 end
 
-local function AnchorCreate()
-	for i=1,4 do
-		local Anchor = CreateFrame("Frame", nil, TPT.Anchors)
-			Anchor:SetHeight(15)
-			Anchor:SetWidth(15)
-			Anchor:EnableMouse(true)
-			Anchor:SetMovable(true)
-			Anchor:Hide()
+local function AnchorCreate(i)
+	local Anchor = CreateFrame("Frame", nil, TPT.Anchors)
+		Anchor:SetHeight(15)
+		Anchor:SetWidth(15)
+		Anchor:EnableMouse(true)
+		Anchor:SetMovable(true)
+		Anchor:Hide()
 
-			Anchor:SetScript("OnMouseDown", AnchorOnMouseDown)
-			Anchor:SetScript("OnMouseUp", AnchorOnMouseUp)
+		Anchor:SetScript("OnMouseDown", AnchorOnMouseDown)
+		Anchor:SetScript("OnMouseUp", AnchorOnMouseUp)
 
-			Anchor.i = i
-			Anchor.Unit = "party"..i
+		Anchor.i = i
+		Anchor.Unit = "party"..i
 
-			TPT.Anchors[i] = Anchor
+		TPT.Anchors[i] = Anchor
 
-		local Index = Anchor:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-			Index:SetPoint("CENTER")
-			Index:SetText(i)
-	end
+	local Index = Anchor:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		Index:SetPoint("CENTER")
+		Index:SetText(i)
+
+	return Anchor
 end
 
 function TPT:AnchorUpdate(i)
@@ -533,18 +534,18 @@ local function QuerySpecInfo()
 
 	if not INSPECT_FRAME then
 		INSPECT_FRAME = CreateFrame("Frame")
-		INSPECT_FRAME:SetScript("OnEvent", function (self, event, ...)
+		INSPECT_FRAME:SetScript("OnEvent", function (Self, Event, ...)
 			if ( (InCombatLockdown()) or (InspectFrame and InspectFrame:IsShown()) or (not INSPECT_CURRENT) ) then return end
 
-			local anchor = TPT.Anchors[INSPECT_CURRENT]
+			local Anchor = TPT.Anchors[INSPECT_CURRENT]
 
-			if ( not anchor or not anchor.Class ) then
+			if ( not Anchor or not Anchor.Class ) then
 				-- anchor not created
 				INSPECT_CURRENT = nil
 				return
 			end
 
-			anchor.Spec = {}
+			Anchor.Spec = {}
 			local Found
 			local TalentGroup = GetActiveTalentGroup(true)
 
@@ -558,13 +559,13 @@ local function QuerySpecInfo()
 						if ( Spent ) then
 							-- Feral Charge
 							if ( Name == FERAL_CHARGE ) then
-								anchor.Spec[FERAL_CHARGE_CAT] = 1
+								Anchor.Spec[FERAL_CHARGE_CAT] = 1
 								Name = FERAL_CHARGE_BEAR
 							end
 
 							if ( TPT.Default.Spec[Name] ) then
 								Found = true
-								anchor.Spec[Name] = Spent
+								Anchor.Spec[Name] = Spent
 							end
 						end
 					end
@@ -572,7 +573,7 @@ local function QuerySpecInfo()
 			end
 
 			if ( not Found ) then
-				anchor.Spec = nil
+				Anchor.Spec = nil
 			else
 				-- Update with new spec.
 				TPT:AnchorUpdate(INSPECT_CURRENT)
@@ -591,17 +592,17 @@ local function QuerySpecInfo()
 
 	if ( TPT.PARTY_NUM > 0 ) then
 		for i=1, TPT.PARTY_NUM do
-			local anchor = TPT.Anchors[i]
-			if not anchor then return end
+			local Anchor = TPT.Anchors[i]
+			if not Anchor then return end
 
-			local unit = anchor.Unit
+			local Unit = Anchor.Unit
 
-			if ( not anchor.Spec ) then
-				if ( UnitIsConnected(unit) ) then
-					if ( CheckInteractDistance(unit, 1) ) then
-						if ( CanInspect(unit) ) then
+			if ( not Anchor.Spec ) then
+				if ( UnitIsConnected(Unit) ) then
+					if ( CheckInteractDistance(Unit, 1) ) then
+						if ( CanInspect(Unit) ) then
 							INSPECT_CURRENT = i
-							NotifyInspect(unit)
+							NotifyInspect(Unit)
 							break
 						end
 					end
@@ -653,28 +654,24 @@ local function GROUP_ROSTER_UPDATE_DELAY()
 	local QuerySpec
 
 	for i=1, 4 do
-		local Anchor = TPT.Anchors[i]
+		local Anchor = TPT.Anchors[i] or AnchorCreate(i)
 
-		if ( Anchor ) then
-			if ( i <= TPT.PARTY_NUM ) then
-				local UnitGUID = UnitGUID(Anchor.Unit)
+		if ( i <= TPT.PARTY_NUM ) then
+			local UnitGUID = UnitGUID(Anchor.Unit)
 
-				if ( (UnitGUID and not Anchor.Spec and not INSPECT_CURRENT) or (Anchor.GUID ~= UnitGUID) ) then
-					TPT:AnchorUpdate(i)
-					QuerySpec = 1
-				elseif ( not Anchor.Active ) then
-					TPT:IconUpdate(i)
-				end
-
-				Anchor:Show()
-				Anchor.Active = 1
-			elseif ( Anchor.Active ) then
-				Anchor:Hide()
-				Anchor.Active = nil
-				StopAllIcons(i, true)
+			if ( (UnitGUID and not Anchor.Spec and not INSPECT_CURRENT) or (Anchor.GUID ~= UnitGUID) ) then
+				TPT:AnchorUpdate(i)
+				QuerySpec = 1
+			elseif ( not Anchor.Active ) then
+				TPT:IconUpdate(i)
 			end
-		else
-			break
+
+			Anchor:Show()
+			Anchor.Active = 1
+		elseif ( Anchor.Active ) then
+			Anchor:Hide()
+			Anchor.Active = nil
+			StopAllIcons(i, true)
 		end
 	end
 
@@ -775,8 +772,6 @@ local function OnLoad()
 	TRINKET_ALLIANCE = GetItemIcon(18854)
 	TRINKET_HORDE = GetItemIcon(18849)
 
-	AnchorCreate()
-
 	-- Init Options
 	local _, AddonTitle = GetAddOnInfo(AddOn)
 	local SO = LibStub("LibSimpleOptions-1.0")
@@ -872,13 +867,15 @@ function TPT:COMBAT_LOG_EVENT_UNFILTERED(...)
 
 			-- Classic: Buff fired BEFORE cast
 			-- Whitelist: Hex
-			if ( CastEvent or (Event == "SPELL_AURA_APPLIED" and SpellName == HEX) ) then
-				TriggerCooldown(SpellName, Anchor)
-			elseif ( SpellType == "BUFF" ) then
-				if ( DestGUID == SourceGUID and TPT.DB.Glow ) then
-					-- Blacklist: Berserk (Enchant), PvP Trinket
-					if ( SpellID ~= 59620 and SpellID ~= 42292 ) then
-						Glow(SpellName, Event, Anchor)
+			if ( Anchor ) then
+				if ( CastEvent or (Event == "SPELL_AURA_APPLIED" and SpellName == HEX) ) then
+					TriggerCooldown(SpellName, Anchor)
+				elseif ( SpellType == "BUFF" ) then
+					if ( DestGUID == SourceGUID and TPT.DB.Glow ) then
+						-- Blacklist: Berserk (Enchant), PvP Trinket, EMFH
+						if ( SpellID ~= 59620 and SpellID ~= 42292 and SpellID ~= 59752 ) then
+							Glow(SpellName, Event, Anchor)
+						end
 					end
 				end
 			end
