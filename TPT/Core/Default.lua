@@ -1,5 +1,10 @@
-local a, b = ...
-b.Spells = {
+local AddOn, TPT, Private = select(2, ...):Init()
+
+TPT.Default = {}
+
+TPT.Version = 1
+
+TPT.Default.Spells = {
 	["DRUID"] = {
 		{29166, 180}, -- Innervate
 		{22812, 60}, -- Barkskin
@@ -166,7 +171,7 @@ b.Spells = {
 	}
 }
 
-b.Racial = {
+TPT.Default.Racial = {
 -- ALIIANCE
 	["Dwarf"] = {20594, 120},
 	["NightElf"] = {58984, 120},
@@ -181,12 +186,12 @@ b.Racial = {
 	["Troll"] = {26297, 180},
 }
 
-b.Trinket = {
+TPT.Default.Trinket = {
 	{42292, 120},
 	{59752, 120},
 }
 
-b.Spec = {
+TPT.Default.Spec = {
 -- MULTI
 	[17116] = 1, -- Nature's Swiftness / 16188
 
@@ -313,4 +318,76 @@ b.Spec = {
 	[49012] = 1, -- Wyvern Sting
 	[3674] = 1, -- Black Arrow
 	[53301] = 1, -- Explosive Shot
+}
+
+TPT.Default.Units = {
+	["party1"] = 1,
+	["party2"] = 2,
+	["party3"] = 3,
+	["party4"] = 4,
+	["partypet1"] = 1,
+	["partypet2"] = 2,
+	["partypet3"] = 3,
+	["partypet4"] = 4,
+}
+
+TPT.Default.Shared = {
+	["DRUID"] = {
+		[16979] = 1, -- Feral Charge - Bear
+		[49376] = 1, -- Feral Charge - Cat
+	},
+	["SHAMAN"] = {
+		[49231] = 1, -- Earth Shock
+		[49233] = 1, -- Flame Shock
+		[49236] = 1, -- Frost Shock
+	},
+	["HUNTER"] = {
+		[60192] = 1, -- Freezing Arrow
+		[14311] = 1, -- Freezing Trap
+		[13809] = 1, -- Frost Trap
+		[49067] = 2, -- Explosive Trap
+		[49056] = 2, -- Immolation Trap
+	},
+	["MAGE"] = {
+		[43010] = 1,  -- Fire Ward
+		[43012] = 1,  -- Frost Ward
+	},
+	["WARRIOR"] = {
+		[72] = 1, -- Shield Bash
+		[6552] = 1, -- Pummel
+	},
+}
+
+TPT.Default.Reset = {
+	[11958] = { -- Cold Snap
+		[42931] = 1, -- Cone of Cold
+		[42917] = 1, -- Frost Nova
+		[43012] = 1, -- Frost Ward
+		[43039] = 1, -- Ice Barrier
+		[45438] = 1, -- Ice Block
+		[31687] = 1, -- Summon Water Elemental
+		[44572] = 1, -- Deep Freeze
+		[44545] = 1, -- Fingers of Frost
+		[12472] = 1, -- Icy Veins
+	},
+	[14185] = { -- Preparation
+		[14177] = 1, -- Cold Blood
+		[26669] = 1, -- Evasion
+		[11305] = 1, -- Sprint
+		[26889] = 1, -- Vanish
+		[36554] = 1, -- Shadowstep
+		[1766] = 1, -- Kick
+		[51722] = 1,-- Dismantle
+	},
+	[23989] = { -- Readiness
+		[19503] = 1, -- Scatter Shot
+		[60192] = 1, -- Freezing Arrow
+		[13809] = 1, -- Frost Trap
+		[14311] = 1, -- Freezing Trap
+		[19574] = 1, -- Bestial Wrath
+		[34490] = 1, -- Silencing Shot
+		[19263] = 1, -- Deterrence
+		[53271] = 1, -- Master's Call
+		[49012] = 1, -- Wyvern Sting
+	},
 }
