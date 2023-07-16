@@ -31,6 +31,7 @@ local HEX
 local FERAL_CHARGE
 local FERAL_CHARGE_CAT
 local FERAL_CHARGE_BEAR
+
 local RACIAL_UNDEAD
 local TRINKET_ALLIANCE
 local TRINKET_HORDE
@@ -39,51 +40,6 @@ local GUID_ACTIVE
 
 TPT.Icons = CreateFrame("Frame", nil, UIParent)
 TPT.Anchors = CreateFrame("Frame", nil, UIParent)
-
---[[
-
-	GLOW
-
-]]
-
-local function AnimateTexCoords_OnUpdate(Self, Elapsed)
-	AnimateTexCoords(Self.A, 256, 256, 48, 48, 22, Elapsed, 0.03)
-end
-
-local function GlowHide(Icon)
-	if ( Icon.Glow and Icon.Glow.SetScript ) then
-		Icon.Swipe:SetAlpha(1)
-		Icon.Glow:Hide()
-		Icon.Glow:SetScript("OnUpdate", nil)
-		Icon.Glow.SetScript = nil
-	end
-end
-
-local function Glow(SpellName, Event, Anchor)
-	for i=1,#Anchor do
-		local Icon = Anchor[i]
-
-		if ( Icon.Name == SpellName ) then
-			if ( Event == "SPELL_AURA_APPLIED" ) then
-				if ( not Icon.Glow ) then
-					Icon.Glow = CreateFrame("Frame", nil, Icon, "TGlow")
-				end
-
-				Icon.Swipe:SetAlpha(0)
-				Icon.Glow:SetScript("OnUpdate", AnimateTexCoords_OnUpdate)
-				Icon.Glow:Show()
-			else
-				GlowHide(Icon)
-
-				if ( Icon.Flash ) then
-					Icon.Flash.D:Play()
-				end
-			end
-
-			break
-		end
-	end
-end
 
 --[[
 
@@ -141,6 +97,51 @@ local function Start(Anchor, Icon, SetCD)
 			TPT:IconUpdate(Anchor.i)
 		else
 			Icon:Show()
+		end
+	end
+end
+
+--[[
+
+	GLOW
+
+]]
+
+local function AnimateTexCoords_OnUpdate(Self, Elapsed)
+	AnimateTexCoords(Self.A, 256, 256, 48, 48, 22, Elapsed, 0.03)
+end
+
+local function GlowHide(Icon)
+	if ( Icon.Glow and Icon.Glow.SetScript ) then
+		Icon.Swipe:SetAlpha(1)
+		Icon.Glow:Hide()
+		Icon.Glow:SetScript("OnUpdate", nil)
+		Icon.Glow.SetScript = nil
+	end
+end
+
+local function Glow(SpellName, Event, Anchor)
+	for i=1,#Anchor do
+		local Icon = Anchor[i]
+
+		if ( Icon.Name == SpellName ) then
+			if ( Event == "SPELL_AURA_APPLIED" ) then
+				if ( not Icon.Glow ) then
+					Icon.Glow = CreateFrame("Frame", nil, Icon, "TGlow")
+				end
+
+				Icon.Swipe:SetAlpha(0)
+				Icon.Glow:SetScript("OnUpdate", AnimateTexCoords_OnUpdate)
+				Icon.Glow:Show()
+			else
+				GlowHide(Icon)
+
+				if ( Icon.Flash ) then
+					Icon.Flash.D:Play()
+				end
+			end
+
+			break
 		end
 	end
 end
@@ -299,7 +300,7 @@ end
 ]]
 
 function TPT.Anchors.Lock()
-	if ( TPT.DB.Lock ) then TPT.Anchors:Hide() else TPT.Anchors:Show() end
+	if ( TPT.DB.Lock or not TPT.ENABLED ) then TPT.Anchors:Hide() else TPT.Anchors:Show() end
 end
 
 local function Attach(Anchor)
@@ -411,7 +412,7 @@ local function AnchorOnMouseUp(Self, Button)
 	end
 end
 
-local function AnchorCreate(i)
+function TPT:AnchorCreate(i)
 	local Anchor = CreateFrame("Frame", nil, TPT.Anchors)
 		Anchor:SetHeight(15)
 		Anchor:SetWidth(15)
@@ -644,7 +645,7 @@ end
 
 local function GetUnitByGUID(GUID)
 	for k,v in pairs(TPT.Default.Units) do
-		if UnitGUID(k) == GUID then
+		if ( UnitGUID(k) == GUID ) then
 			return k, v
 		end
 	end
@@ -654,20 +655,21 @@ local function GROUP_ROSTER_UPDATE_DELAY()
 	local QuerySpec
 
 	for i=1, 4 do
-		local Anchor = TPT.Anchors[i] or AnchorCreate(i)
+		local Anchor = TPT.Anchors[i] or TPT:AnchorCreate(i)
 
 		if ( i <= TPT.PARTY_NUM ) then
 			local UnitGUID = UnitGUID(Anchor.Unit)
 
 			if ( (UnitGUID and not Anchor.Spec and not INSPECT_CURRENT) or (Anchor.GUID ~= UnitGUID) ) then
-				TPT:AnchorUpdate(i)
 				QuerySpec = 1
+				Anchor.Spec = nil
+				TPT:AnchorUpdate(i)
 			elseif ( not Anchor.Active ) then
 				TPT:IconUpdate(i)
 			end
 
-			Anchor:Show()
 			Anchor.Active = 1
+			Anchor:Show()
 		elseif ( Anchor.Active ) then
 			Anchor:Hide()
 			Anchor.Active = nil
@@ -756,7 +758,7 @@ local function OnLoad()
 		INSPECT_READY = "INSPECT_READY"
 	end
 
-	if (TPTDB and ( (TPTDB.V and TPT.Version ~= TPTDB.V) or not TPTDB.V) ) or not TPTDB then
+	if ( not TPTDB or not TPTDB.V or TPT.Version ~= TPTDB.V ) then
 		print("|cffFF4500/tpt")
 		TPTDB = { Spells = TPT.Default.Spells, Position = {}, Scale = 1, OffY = 2, OffX = 5, SpaceX = 0, SpaceY = 0, Glow = 1, V = TPT.Version, Border = true, World = true, Arena = true, Trinket = true, Racial = true }
 	end
@@ -764,10 +766,11 @@ local function OnLoad()
 
 	TPT:Locale()
 
+	HEX = GetSpellInfo(51514)
 	FERAL_CHARGE = GetSpellInfo(49377)
 	FERAL_CHARGE_BEAR = GetSpellInfo(16979)
 	FERAL_CHARGE_CAT = GetSpellInfo(49376)
-	HEX = GetSpellInfo(51514)
+
 	RACIAL_UNDEAD = GetSpellInfo(7744)
 	TRINKET_ALLIANCE = GetItemIcon(18854)
 	TRINKET_HORDE = GetItemIcon(18849)
@@ -856,8 +859,12 @@ end
 function TPT:COMBAT_LOG_EVENT_UNFILTERED(...)
 	local _, Event, _, SourceGUID, _, _, _, DestGUID, _, _, _, SpellID, SpellName, _, SpellType = CombatLogGetCurrentEventInfo(...)
 
-	local AuraEvent = (Event == "SPELL_AURA_REMOVED") or (Event == "SPELL_AURA_APPLIED")
+	local AuraEvent = (Event == "SPELL_AURA_REMOVED" or Event == "SPELL_AURA_APPLIED")
 	local CastEvent = (Event == "SPELL_CAST_SUCCESS")
+
+	if ( (Event == "SPELL_AURA_APPLIED" or Event == "SPELL_MISSED") and SpellName == HEX ) then
+		CastEvent = 1 -- Bug
+	end
 
 	if ( CastEvent or AuraEvent ) then
 		local Source, SourceID = GetUnitByGUID(SourceGUID)
@@ -865,17 +872,14 @@ function TPT:COMBAT_LOG_EVENT_UNFILTERED(...)
 		if ( Source ) then
 			local Anchor = TPT.Anchors[SourceID]
 
-			-- Classic: Buff fired BEFORE cast
-			-- Whitelist: Hex
+			-- Classic: Buff BEFORE cast
 			if ( Anchor ) then
-				if ( CastEvent or (Event == "SPELL_AURA_APPLIED" and SpellName == HEX) ) then
+				if ( CastEvent ) then
 					TriggerCooldown(SpellName, Anchor)
-				elseif ( SpellType == "BUFF" ) then
-					if ( DestGUID == SourceGUID and TPT.DB.Glow ) then
-						-- Blacklist: Berserk (Enchant), PvP Trinket, EMFH
-						if ( SpellID ~= 59620 and SpellID ~= 42292 and SpellID ~= 59752 ) then
-							Glow(SpellName, Event, Anchor)
-						end
+				elseif ( SpellType == "BUFF" and DestGUID == SourceGUID and TPT.DB.Glow ) then
+					-- Blacklist: Berserk (Enchant), PvP Trinket, EMFH, EM
+					if ( SpellID ~= 59620 and SpellID ~= 42292 and SpellID ~= 59752 and SpellID ~= 64701 ) then
+						Glow(SpellName, Event, Anchor)
 					end
 				end
 			end
@@ -884,10 +888,9 @@ function TPT:COMBAT_LOG_EVENT_UNFILTERED(...)
 end
 
 TPT:SetScript("OnEvent", function(Self, Event, ...)
-	local Event = Self[Event]
+	Event = Self[Event]
 	if ( Event ) then
 		Event(Self, ...)
-		end
-	end)
-
+	end
+end)
 TPT:RegisterEvent("PLAYER_ENTERING_WORLD")

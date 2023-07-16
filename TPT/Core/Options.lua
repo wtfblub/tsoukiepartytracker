@@ -14,7 +14,7 @@ local GetSpellTexture = C_GetSpellTexture or GetSpellTexture
 local LOCALIZED_CLASS_NAMES_MALE = LOCALIZED_CLASS_NAMES_MALE
 
 local function UpdateAllAnchorIcons()
-	if ( TPT.PARTY_NUM > 0 and TPT.ENABLED ) then
+	if ( TPT.PARTY_NUM > 0 ) then
 		for i=1, TPT.PARTY_NUM do
 			TPT:IconUpdate(i)
 		end
@@ -22,22 +22,12 @@ local function UpdateAllAnchorIcons()
 end
 
 local function UpdateAllAnchors()
-	if ( TPT.PARTY_NUM > 0 and TPT.ENABLED ) then
-		local Anchor
-
+	if ( TPT.PARTY_NUM > 0 ) then
 		for i=1, TPT.PARTY_NUM do
-			Anchor = TPT.Anchors[i]
-
-			if ( Anchor ) then
-				TPT:AnchorUpdate(i)
-			else
-				break
-			end
+			TPT:AnchorUpdate(i)
 		end
 
-		if ( Anchor ) then
-			TPT:AnchorUpdatePosition()
-		end
+		TPT:AnchorUpdatePosition()
 	end
 end
 
@@ -105,13 +95,7 @@ end
 
 local function ZoneSet(setting, value)
 	TPT.DB[setting] = value
-
-	TPT:QuerySpecStop()
-	TPT:EnableCheck()
-	if ( TPT.ENABLED ) then
-		UpdateAllAnchors()
-		TPT:QuerySpecStart()
-	end
+	TPT:GROUP_ROSTER_UPDATE(1)
 end
 
 local function SettingsPrint(title, msg)
@@ -316,7 +300,7 @@ local function CreateAbilityEditor()
 	order:SetWidth(80)
 	child.order = order
 
-	local updatebtn = panel:MakeButton(	
+	local updatebtn = panel:MakeButton(
 		'name', 'Add/Update',
 		'description', "Add / Update Ability",
 		'func', function()

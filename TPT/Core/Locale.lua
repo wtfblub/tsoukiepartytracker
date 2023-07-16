@@ -62,8 +62,7 @@ function TPT:Locale()
 		local SpellName = GetSpellInfo(SpellID)
 
 		if ( SpellName ) then
-			-- This value ~= 1 could be cleaned up... it was mainly for feral charge
-			Lang[SpellName] = (Value ~= 1) and GetSpellInfo(Value) or 1
+			Lang[SpellName] = GetSpellInfo(Value)
 		end
 	end
 	TPT.Default.Spec = Lang

@@ -1,8 +1,8 @@
 local AddOn, TPT, Private = select(2, ...):Init()
 
-TPT.Default = {}
-
 TPT.Version = 1
+
+TPT.Default = {}
 
 TPT.Default.Spells = {
 	["DRUID"] = {
