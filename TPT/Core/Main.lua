@@ -412,7 +412,7 @@ local function AnchorOnMouseUp(Self, Button)
 	end
 end
 
-function TPT:AnchorCreate(i)
+function AnchorCreate(i)
 	local Anchor = CreateFrame("Frame", nil, TPT.Anchors)
 		Anchor:SetHeight(15)
 		Anchor:SetWidth(15)
@@ -655,7 +655,7 @@ local function GROUP_ROSTER_UPDATE_DELAY()
 	local QuerySpec
 
 	for i=1, 4 do
-		local Anchor = TPT.Anchors[i] or TPT:AnchorCreate(i)
+		local Anchor = TPT.Anchors[i] or AnchorCreate(i)
 
 		if ( i <= TPT.PARTY_NUM ) then
 			local UnitGUID = UnitGUID(Anchor.Unit)
