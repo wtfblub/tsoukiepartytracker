@@ -13,21 +13,17 @@ local GetSpellInfo = GetSpellInfo
 local GetSpellTexture = C_GetSpellTexture or GetSpellTexture
 local LOCALIZED_CLASS_NAMES_MALE = LOCALIZED_CLASS_NAMES_MALE
 
-local function UpdateAllAnchorIcons()
+local function UpdateAllAnchors(Type)
 	if ( TPT.PARTY_NUM > 0 ) then
 		for i=1, TPT.PARTY_NUM do
-			TPT:IconUpdate(i)
+			if ( Type == "Icons" ) then
+				TPT:IconUpdate(i)
+			elseif ( Type == "Position" ) then
+				TPT:AnchorUpdatePosition(i)
+			else
+				TPT:AnchorUpdate(i)
+			end
 		end
-	end
-end
-
-local function UpdateAllAnchors()
-	if ( TPT.PARTY_NUM > 0 ) then
-		for i=1, TPT.PARTY_NUM do
-			TPT:AnchorUpdate(i)
-		end
-
-		TPT:AnchorUpdatePosition()
 	end
 end
 
@@ -439,7 +435,7 @@ ALIGN
 		'setFunc', function(value)
 			TPT.DB.Attach = value
 			AttachToggle(panel)
-			TPT:AnchorUpdatePosition()
+			UpdateAllAnchors("Position")
 		end)
 	attach:SetPoint("TOPLEFT", panel, "TOPLEFT", 330, -10)
 
@@ -480,7 +476,7 @@ DISPLAY
 		'description', 'Only show icon on cooldown.',
 		'default', false,
 		'getFunc', function() return TPT.DB.Hidden end,
-		'setFunc', function(value) TPT.DB.Hidden = value UpdateAllAnchors() end)
+		'setFunc', function(value) TPT.DB.Hidden = value UpdateAllAnchors("Icons") end)
 	hidden:SetPoint("TOPLEFT", scale, "TOPLEFT", 120, 5)
 
 	local glow = panel:MakeToggle(
@@ -504,7 +500,7 @@ DISPLAY
 		'description', 'Grow icons to the left.',
 		'default', false,
 		'getFunc', function() return TPT.DB.Left end,
-		'setFunc', function(value) TPT.DB.Left = value UpdateAllAnchors() end)
+		'setFunc', function(value) TPT.DB.Left = value UpdateAllAnchors("Position") UpdateAllAnchors("Icons") end)
 	left:SetPoint("TOPLEFT", scale, "TOPLEFT", 0, -25)
 	
 	local rows = panel:MakeToggle(
@@ -515,7 +511,7 @@ DISPLAY
 		'setFunc', function(value)
 			TPT.DB.Rows = value
 			RowToggle(panel)
-			UpdateAllAnchorIcons()
+			UpdateAllAnchors("Icons")
 		end)
 	rows:SetPoint("LEFT", left, "RIGHT", CheckOffsetX + 20, 0)
 
@@ -524,7 +520,7 @@ DISPLAY
 		'description', 'Show icons under attached frame.',
 		'default', false,
 		'getFunc', function() return TPT.DB.Horiz end,
-		'setFunc', function(value) TPT.DB.Horiz = value TPT:AnchorUpdatePosition() end)
+		'setFunc', function(value) TPT.DB.Horiz = value UpdateAllAnchors("Position") end)
 	horiz:SetPoint("LEFT", rows, "RIGHT", CheckOffsetX + 20, 0)
 	panel.horiz = horiz
 
@@ -552,7 +548,7 @@ OFFSETS
 		'step', 0.01,
 		'default', 1,
 		'current', TPT.DB.OffX,
-		'setFunc', function(value) TPT.DB.OffX = value TPT:AnchorUpdatePosition() end,
+		'setFunc', function(value) TPT.DB.OffX = value UpdateAllAnchors("Position") end,
 		'currentTextFunc', function(value) return floor(value) end)
 	offsetX:SetPoint("TOP", left, "BOTTOM", 25, -30)
 	offsetX:SetWidth(SliderWidth)
@@ -568,7 +564,7 @@ OFFSETS
 		'step', 0.01,
 		'default', 1,
 		'current', TPT.DB.OffY,
-		'setFunc', function(value) TPT.DB.OffY = value TPT:AnchorUpdatePosition() end,
+		'setFunc', function(value) TPT.DB.OffY = value TPT:UpdateAllAnchors("Position") end,
 		'currentTextFunc', function(value) return floor(value) end)
 	offsetY:SetPoint("LEFT", offsetX, "RIGHT", 20, 0)
 	offsetY:SetWidth(SliderWidth)
@@ -585,7 +581,7 @@ OFFSETS
 		'step', 1,
 		'default', 0,
 		'current', TPT.DB.SpaceX,
-		'setFunc', function(value) TPT.DB.SpaceX = value UpdateAllAnchorIcons() end,
+		'setFunc', function(value) TPT.DB.SpaceX = value UpdateAllAnchors("Icons") end,
 		'currentTextFunc', function(value) return value end)
 	spacingX:SetPoint("LEFT", offsetY, "RIGHT", 20, 0)
 	spacingX:SetWidth(SliderWidth)
@@ -600,7 +596,7 @@ OFFSETS
 		'step', 1,
 		'default', 0,
 		'current', TPT.DB.SpaceY,
-		'setFunc', function(value) TPT.DB.SpaceY = value UpdateAllAnchorIcons() end,
+		'setFunc', function(value) TPT.DB.SpaceY = value UpdateAllAnchors("Icons") end,
 		'currentTextFunc', function(value) return value end)
 	spacingY:SetPoint("LEFT", spacingX, "RIGHT", 20, 0)
 	spacingY:SetWidth(SliderWidth)

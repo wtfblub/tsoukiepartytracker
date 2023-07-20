@@ -352,36 +352,38 @@ local function Attach(Anchor)
 	end
 end
 
-function TPT:AnchorUpdatePosition()
-	if ( TPT.PARTY_NUM > 0 and TPT.ENABLED ) then
-		for i=1, TPT.PARTY_NUM do
-			local Anchor = TPT.Anchors[i]
-			local Frame = (TPT.DB.Attach) and Attach(Anchor) or nil
+function TPT:AnchorUpdatePosition(i)
+	local Point, Relative, X, Y
+	local Anchor = TPT.Anchors[i]
+	local Parent = (TPT.DB.Attach) and Attach(Anchor) or nil
 
-			Anchor:ClearAllPoints()
+	Anchor:ClearAllPoints()
 
-			if ( Frame ) then
-				local Relative
-				if ( TPT.DB.Horiz ) then
-					Relative = TPT.DB.Left and "BOTTOMRIGHT" or "BOTTOMLEFT"
-				else	
-					Relative = TPT.DB.Left and "TOPLEFT" or "TOPRIGHT"
-				end
-				Anchor:SetPoint(TPT.DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", Frame, Relative, TPT.DB.OffX, TPT.DB.OffY)
-			else
-				local Point, X, Y
-				if ( TPT.DB.Position[i] ) then
-					local Scale = Anchor:GetEffectiveScale()
-					X = TPT.DB.Position[i].X/Scale
-					Y = TPT.DB.Position[i].Y/Scale
-					Point = "TOPLEFT"
-				else
-					Point = "CENTER"
-				end
-				Anchor:SetPoint(Point, UIParent, Point, X, Y)
-			end
+	if ( Parent ) then
+		if ( TPT.DB.Horiz ) then
+			Relative = TPT.DB.Left and "BOTTOMRIGHT" or "BOTTOMLEFT"
+		else	
+			Relative = TPT.DB.Left and "TOPLEFT" or "TOPRIGHT"
 		end
+
+		Point = TPT.DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT"
+		X = TPT.DB.OffX
+		Y = TPT.DB.OffY
+	else
+		if ( TPT.DB.Position[i] ) then
+			local Scale = Anchor:GetEffectiveScale()
+			X = TPT.DB.Position[i].X/Scale
+			Y = TPT.DB.Position[i].Y/Scale
+			Point = "TOPLEFT"
+		else
+			Point = "CENTER"
+		end
+
+		Relative = Point
+		Parent = UIParent
 	end
+
+	Anchor:SetPoint(Point, Parent, Relative, X, Y)
 end
 
 local function AnchorPositionSave(i)
@@ -652,8 +654,6 @@ local function GetUnitByGUID(GUID)
 end
 
 local function GROUP_ROSTER_UPDATE_DELAY()
-	local QuerySpec
-
 	for i=1, 4 do
 		local Anchor = TPT.Anchors[i] or AnchorCreate(i)
 
@@ -661,11 +661,23 @@ local function GROUP_ROSTER_UPDATE_DELAY()
 			local UnitGUID = UnitGUID(Anchor.Unit)
 
 			if ( (UnitGUID and not Anchor.Spec and not INSPECT_CURRENT) or (Anchor.GUID ~= UnitGUID) ) then
-				QuerySpec = 1
 				Anchor.Spec = nil
 				TPT:AnchorUpdate(i)
+				TPT:AnchorUpdatePosition(i)
+
+				-- Cleanse Stale GUIDs
+				for GUID in pairs(GUID_ACTIVE) do
+					if ( not GetUnitByGUID(GUID) ) then
+						GUID_ACTIVE[GUID] = nil
+					end
+				end
+
+				INSPECT_CURRENT = nil
+				QUERY_SPEC_TICK_TIMEOUT = nil
+				TPT:QuerySpecStart()
 			elseif ( not Anchor.Active ) then
 				TPT:IconUpdate(i)
+				TPT:AnchorUpdatePosition(i)
 			end
 
 			Anchor.Active = 1
@@ -675,21 +687,6 @@ local function GROUP_ROSTER_UPDATE_DELAY()
 			Anchor.Active = nil
 			StopAllIcons(i, true)
 		end
-	end
-
-	if ( QuerySpec ) then
-		-- Cleanse Stale GUIDs
-		for GUID in pairs(GUID_ACTIVE) do
-			if ( not GetUnitByGUID(GUID) ) then
-				GUID_ACTIVE[GUID] = nil
-			end
-		end
-
-		TPT:AnchorUpdatePosition()
-
-		INSPECT_CURRENT = nil
-		QUERY_SPEC_TICK_TIMEOUT = nil
-		TPT:QuerySpecStart()
 	end
 
 	GROUP_ROSTER_UPDATE_DELAY_QUEUED = nil
