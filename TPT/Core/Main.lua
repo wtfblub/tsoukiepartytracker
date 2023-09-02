@@ -23,8 +23,6 @@ local QUERY_SPEC_TICK
 local QUERY_SPEC_TICK_TIMEOUT
 local GROUP_ROSTER_UPDATE_DELAY_QUEUED
 
-local GROUP_ROSTER_UPDATE
-local INSPECT_READY
 local PLAYER_FACTION
 
 local HEX
@@ -284,6 +282,7 @@ local function StopAllIcons(Anchor, Hide)
 		for k=1, #Icons do
 			local Icon = Icons[k]
 
+			GlowHide(Icon)
 			if ( Hide ) then
 				Icon:Hide()
 			else
@@ -535,15 +534,14 @@ local function QuerySpecInfo()
 
 	if ( InvalidSpecQuery() ) then return end
 
-	if not INSPECT_FRAME then
+	if ( not INSPECT_FRAME ) then
 		INSPECT_FRAME = CreateFrame("Frame")
 		INSPECT_FRAME:SetScript("OnEvent", function (Self, Event, ...)
 			if ( (InCombatLockdown()) or (InspectFrame and InspectFrame:IsShown()) or (not INSPECT_CURRENT) ) then return end
 
 			local Anchor = TPT.Anchors[INSPECT_CURRENT]
 
-			if ( not Anchor or not Anchor.Class ) then
-				-- anchor not created
+			if ( not Anchor or not Anchor.Class ) then -- anchor not created
 				INSPECT_CURRENT = nil
 				return
 			end
@@ -578,8 +576,7 @@ local function QuerySpecInfo()
 			if ( not Found ) then
 				Anchor.Spec = nil
 			else
-				-- Update with new spec.
-				TPT:AnchorUpdate(INSPECT_CURRENT)
+				TPT:AnchorUpdate(INSPECT_CURRENT) -- Update icons.
 			end
 
 			if ( INSPECT_CURRENT == TPT.PARTY_NUM ) then
@@ -590,7 +587,7 @@ local function QuerySpecInfo()
 			INSPECT_CURRENT = nil
 			QUERY_SPEC_TICK_TIMEOUT = nil
 		end)
-		INSPECT_FRAME:RegisterEvent(INSPECT_READY)
+		INSPECT_FRAME:RegisterEvent("INSPECT_READY")
 	end
 
 	if ( TPT.PARTY_NUM > 0 ) then
@@ -716,13 +713,8 @@ function TPT:EnableCheck()
 end
 
 function TPT:GROUP_ROSTER_UPDATE(ZoneChanged)
-	local GroupSize = GetNumGroupMembers()
-	if ( IsInRaid() ) then
-		GroupSize = GroupSize - 1
-	end
-
 	local TPT_PARTY_NUM_PREVIOUS = TPT.PARTY_NUM or 0
-	TPT.PARTY_NUM = GroupSize > 4 and 4 or GroupSize
+	TPT.PARTY_NUM = GetNumSubgroupMembers()
 
 	local PartyChanged = TPT.PARTY_NUM ~= TPT_PARTY_NUM_PREVIOUS
 
@@ -742,19 +734,7 @@ function TPT:GROUP_ROSTER_UPDATE(ZoneChanged)
 	end
 end
 
-function TPT:PARTY_MEMBERS_CHANGED()
-	TPT:GROUP_ROSTER_UPDATE()
-end
-
 local function OnLoad()
-	if ( GetBuildInfo() == "3.3.5" ) then
-		GROUP_ROSTER_UPDATE = "PARTY_MEMBERS_CHANGED"
-		INSPECT_READY = "INSPECT_TALENT_READY"
-	else
-		GROUP_ROSTER_UPDATE = "GROUP_ROSTER_UPDATE"
-		INSPECT_READY = "INSPECT_READY"
-	end
-
 	if ( not TPTDB or not TPTDB.V or TPT.Version ~= TPTDB.V ) then
 		print("|cffFF4500/tpt")
 		TPTDB = { Spells = TPT.Default.Spells, Position = {}, Scale = 1, OffY = 2, OffX = 5, SpaceX = 0, SpaceY = 0, Glow = 1, V = TPT.Version, Border = true, World = true, Arena = true, Trinket = true, Racial = true }
@@ -787,7 +767,7 @@ local function OnLoad()
 
 	GUID_ACTIVE = {}
 
-	TPT:RegisterEvent(GROUP_ROSTER_UPDATE)
+	TPT:RegisterEvent("GROUP_ROSTER_UPDATE")
 end
 
 function TPT:PLAYER_ENTERING_WORLD()
@@ -814,6 +794,10 @@ function TPT:PLAYER_ENTERING_WORLD()
 end
 
 local function TriggerCooldown(SpellName, Anchor)
+	if ( not Anchor.Spec ) then
+		QuerySpecStart()
+	end
+
 	for i=1,#Anchor do
 		local Icon = Anchor[i]
 
@@ -855,15 +839,13 @@ end
 
 function TPT:COMBAT_LOG_EVENT_UNFILTERED(...)
 	local _, Event, _, SourceGUID, _, _, _, DestGUID, _, _, _, SpellID, SpellName, _, SpellType = CombatLogGetCurrentEventInfo(...)
-
-	local AuraEvent = (Event == "SPELL_AURA_REMOVED" or Event == "SPELL_AURA_APPLIED")
 	local CastEvent = (Event == "SPELL_CAST_SUCCESS")
 
 	if ( (Event == "SPELL_AURA_APPLIED" or Event == "SPELL_MISSED") and SpellName == HEX ) then
 		CastEvent = 1 -- Bug
 	end
 
-	if ( CastEvent or AuraEvent ) then
+	if ( CastEvent or Event == "SPELL_AURA_REMOVED" or Event == "SPELL_AURA_APPLIED" ) then
 		local Source, SourceID = GetUnitByGUID(SourceGUID)
 
 		if ( Source ) then
