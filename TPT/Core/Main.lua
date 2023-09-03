@@ -10,7 +10,9 @@ local TimerAfter = C_Timer.After
 local GetSpellInfo = GetSpellInfo
 local IsInInstance = IsInInstance
 local CooldownFrame_Set = CooldownFrame_Set
+local GetNumSubgroupMembers = GetNumSubgroupMembers
 local GetSpellTexture = C_GetSpellTexture or GetSpellTexture
+
 
 local CURRENT_ZONE_TYPE
 local PREVIOUS_ZONE_TYPE
