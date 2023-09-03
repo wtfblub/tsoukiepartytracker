@@ -1,7 +1,7 @@
 ## Interface: 30300
 ## Author Tsoukie
 ## Title: Tsoukie Party Tracker
-## Version: 1.0.7
+## Version: 1.0.8
 ## Notes: Track all selected cooldowns of your party members.
 ## SavedVariables: TPTDB
 
