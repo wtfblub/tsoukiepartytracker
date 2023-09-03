@@ -526,7 +526,7 @@ function TPT:QuerySpecStop()
 end
 
 local function QuerySpecInfo()
-	if ( QUERY_SPEC_TICK_TIMEOUT and (QUERY_SPEC_TICK_TIMEOUT >= 5)  ) then -- 3*5 = 8
+	if ( QUERY_SPEC_TICK_TIMEOUT and (QUERY_SPEC_TICK_TIMEOUT >= 5)  ) then -- 4*5 = 20
 		TPT:QuerySpecStop()
 	else
 		QUERY_SPEC_TICK_TIMEOUT = (QUERY_SPEC_TICK_TIMEOUT or 0) + 1
@@ -616,7 +616,8 @@ end
 
 function TPT:QuerySpecStart()
 	if ( (QUERY_SPEC_TICK and QUERY_SPEC_TICK:IsCancelled()) or not QUERY_SPEC_TICK ) then
-		QUERY_SPEC_TICK = Timer(3, QuerySpecInfo)
+		QUERY_SPEC_TICK = Timer(4, QuerySpecInfo)
+		QuerySpecInfo()
 	end
 end
 
@@ -795,7 +796,7 @@ end
 
 local function TriggerCooldown(SpellName, Anchor)
 	if ( not Anchor.Spec ) then
-		QuerySpecStart()
+		TPT:QuerySpecStart()
 	end
 
 	for i=1,#Anchor do
