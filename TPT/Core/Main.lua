@@ -72,15 +72,11 @@ local function Stop(Icon)
 	local StartTime, StartUnit = Active(Icon)
 
 	if ( Icon.Active or StartTime ) then
-		CooldownFrame_Set(Icon.Swipe, 0, 0, 0)
-
-		if ( TPT.DB.Hidden ) then
-			Icon:Hide()
-		end
-
 		if ( StartTime ) then
 			StartUnit[Icon.Name] = nil
 		end
+
+		CooldownFrame_Set(Icon.Swipe, 0, 0, 0)
 	end
 end
 
@@ -88,7 +84,7 @@ local function Start(Anchor, Icon, SetCD)
 	if ( Icon.Name ) then
 		CooldownFrame_Set(Icon.Swipe, Active(Icon, GetTime()), SetCD or Icon.CD, 1)
 
-		Icon.Active = true
+		Icon.Active = 1
 
 		if ( TPT.DB.Glow ) then
 			if ( not Icon.Flash ) then
@@ -213,14 +209,12 @@ end
 
 local function Cooldown_OnHide(Self)
 	local Icon = Self:GetParent()
-	local Anchor = Icon.Anchor
 
 	GlowHide(Icon)
-
 	Icon.Active = nil
 
 	if ( TPT.DB.Hidden ) then
-		TPT:IconUpdate(Anchor.i)
+		TPT:IconUpdate(Icon.Anchor.i)
 	end
 end
 
