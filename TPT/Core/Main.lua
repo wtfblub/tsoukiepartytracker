@@ -74,6 +74,10 @@ local function Stop(Icon)
 	if ( Icon.Active or StartTime ) then
 		CooldownFrame_Set(Icon.Swipe, 0, 0, 0)
 
+		if ( TPT.DB.Hidden ) then
+			Icon:Hide()
+		end
+
 		if ( StartTime ) then
 			StartUnit[Icon.Name] = nil
 		end
