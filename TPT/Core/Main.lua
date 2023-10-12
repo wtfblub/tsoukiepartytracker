@@ -207,6 +207,17 @@ local function TooltipOnLeave(Self)
 	end
 end
 
+local function Cooldown_OnHide(Self)
+	local Icon = Self:GetParent()
+
+	GlowHide(Icon)
+	Icon.Active = nil
+
+	if ( TPT.DB.Hidden and Icon.Anchor.Active ) then
+		TPT:IconUpdate(Icon.Anchor.i)
+	end
+end
+
 local function IconCreate(Anchor)
 	local Icon = CreateFrame("Frame", nil, TPT.Icons, "ActionButtonTemplate")
 	local Swipe = CreateFrame("Cooldown", nil, Icon, "CooldownFrameTemplate")
@@ -262,17 +273,6 @@ local function IconSet(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 	end
 
 	return Icon, (Num + 1)
-end
-
-local function Cooldown_OnHide(Self)
-	local Icon = Self:GetParent()
-
-	GlowHide(Icon)
-	Icon.Active = nil
-
-	if ( TPT.DB.Hidden and Icon.Anchor.Active ) then
-		TPT:IconUpdate(Icon.Anchor.i)
-	end
 end
 
 local function StopAllIcons(Anchor, Hide)
