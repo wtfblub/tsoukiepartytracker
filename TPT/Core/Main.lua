@@ -43,6 +43,51 @@ TPT.Anchors = CreateFrame("Frame", nil, UIParent)
 
 --[[
 
+	GLOW
+
+]]
+
+local function AnimateTexCoords_OnUpdate(Self, Elapsed)
+	AnimateTexCoords(Self.A, 256, 256, 48, 48, 22, Elapsed, 0.03)
+end
+
+local function GlowHide(Icon)
+	if ( Icon.Glow and Icon.Glow.SetScript ) then
+		Icon.Swipe:SetAlpha(1)
+		Icon.Glow:Hide()
+		Icon.Glow:SetScript("OnUpdate", nil)
+		Icon.Glow.SetScript = nil
+	end
+end
+
+local function Glow(SpellName, Event, Anchor)
+	for i=1,#Anchor do
+		local Icon = Anchor[i]
+
+		if ( Icon.Name == SpellName ) then
+			if ( Event == "SPELL_AURA_APPLIED" ) then
+				if ( not Icon.Glow ) then
+					Icon.Glow = CreateFrame("Frame", nil, Icon, "TGlow")
+				end
+
+				Icon.Swipe:SetAlpha(0)
+				Icon.Glow:SetScript("OnUpdate", AnimateTexCoords_OnUpdate)
+				Icon.Glow:Show()
+			else
+				GlowHide(Icon)
+
+				if ( Icon.Flash ) then
+					Icon.Flash.D:Play()
+				end
+			end
+
+			break
+		end
+	end
+end
+
+--[[
+
 	COOLDOWN
 
 ]]
@@ -97,51 +142,6 @@ local function Start(Anchor, Icon, SetCD)
 			TPT:IconUpdate(Anchor.i)
 		else
 			Icon:Show()
-		end
-	end
-end
-
---[[
-
-	GLOW
-
-]]
-
-local function AnimateTexCoords_OnUpdate(Self, Elapsed)
-	AnimateTexCoords(Self.A, 256, 256, 48, 48, 22, Elapsed, 0.03)
-end
-
-local function GlowHide(Icon)
-	if ( Icon.Glow and Icon.Glow.SetScript ) then
-		Icon.Swipe:SetAlpha(1)
-		Icon.Glow:Hide()
-		Icon.Glow:SetScript("OnUpdate", nil)
-		Icon.Glow.SetScript = nil
-	end
-end
-
-local function Glow(SpellName, Event, Anchor)
-	for i=1,#Anchor do
-		local Icon = Anchor[i]
-
-		if ( Icon.Name == SpellName ) then
-			if ( Event == "SPELL_AURA_APPLIED" ) then
-				if ( not Icon.Glow ) then
-					Icon.Glow = CreateFrame("Frame", nil, Icon, "TGlow")
-				end
-
-				Icon.Swipe:SetAlpha(0)
-				Icon.Glow:SetScript("OnUpdate", AnimateTexCoords_OnUpdate)
-				Icon.Glow:Show()
-			else
-				GlowHide(Icon)
-
-				if ( Icon.Flash ) then
-					Icon.Flash.D:Play()
-				end
-			end
-
-			break
 		end
 	end
 end
@@ -207,17 +207,6 @@ local function TooltipOnLeave(Self)
 	end
 end
 
-local function Cooldown_OnHide(Self)
-	local Icon = Self:GetParent()
-
-	GlowHide(Icon)
-	Icon.Active = nil
-
-	if ( TPT.DB.Hidden ) then
-		TPT:IconUpdate(Icon.Anchor.i)
-	end
-end
-
 local function IconCreate(Anchor)
 	local Icon = CreateFrame("Frame", nil, TPT.Icons, "ActionButtonTemplate")
 	local Swipe = CreateFrame("Cooldown", nil, Icon, "CooldownFrameTemplate")
@@ -273,6 +262,17 @@ local function IconSet(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 	end
 
 	return Icon, (Num + 1)
+end
+
+local function Cooldown_OnHide(Self)
+	local Icon = Self:GetParent()
+
+	GlowHide(Icon)
+	Icon.Active = nil
+
+	if ( TPT.DB.Hidden and Icon.Anchor.Active ) then
+		TPT:IconUpdate(Icon.Anchor.i)
+	end
 end
 
 local function StopAllIcons(Anchor, Hide)
