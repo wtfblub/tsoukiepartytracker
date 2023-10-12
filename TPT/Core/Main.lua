@@ -630,7 +630,7 @@ end
 local function ValidZoneType()
 	if (TPT.DB.Arena and CURRENT_ZONE_TYPE == "arena") or
 		(TPT.DB.Dungeon and CURRENT_ZONE_TYPE == "party") or
-		(((TPT.DB.World and CURRENT_ZONE_TYPE == "none") or (TPT.DB.Raid and (CURRENT_ZONE_TYPE == "raid" or CURRENT_ZONE_TYPE == "pvp"))) and TPT.PARTY_NUM < 5 )
+		(((TPT.DB.World and CURRENT_ZONE_TYPE == "none") or (TPT.DB.Raid and (CURRENT_ZONE_TYPE == "raid" or CURRENT_ZONE_TYPE == "pvp"))) and (TPT.PARTY_NUM < 5 or not TPT.DB.Lock))
 	then
 		return 1
 	end
