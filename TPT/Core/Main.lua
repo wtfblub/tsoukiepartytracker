@@ -13,7 +13,6 @@ local CooldownFrame_Set = CooldownFrame_Set
 local GetNumSubgroupMembers = GetNumSubgroupMembers
 local GetSpellTexture = C_GetSpellTexture or GetSpellTexture
 
-
 local CURRENT_ZONE_TYPE
 local PREVIOUS_ZONE_TYPE
 
@@ -441,66 +440,67 @@ function TPT:AnchorUpdate(i)
 	local Unit = Anchor.Unit
 
 	local _, Class = UnitClass(Unit)
-	if ( not Class ) then return end
 
-	local _, Race = UnitRace(Unit)
+	if ( Class ) then
+		local _, Race = UnitRace(Unit)
 
-	local Icon
-	local Num = 1
-	local Time = GetTime()
+		local Icon
+		local Num = 1
+		local Time = GetTime()
 
-	Anchor.GUID = UnitGUID(Unit)
-	Anchor.Class = Class
-	Anchor.Race = Race
+		Anchor.GUID = UnitGUID(Unit)
+		Anchor.Class = Class
+		Anchor.Race = Race
 
-	-- PvP Trinket
-	local PvPTrinket = (Race == "Human") and TPT.Default.Trinket[2] or TPT.Default.Trinket[1]
-	if ( TPT.DB.Trinket ) then
-		local PvPTrinketIcon = (PLAYER_FACTION == "Alliance") and TRINKET_ALLIANCE or TRINKET_HORDE
-		local TrinketID, TrinketCD, TrinketName = PvPTrinket[1], PvPTrinket[2], PvPTrinket[3]
-		_, Num = IconSet(Anchor, Num, nil, Time, TrinketName, TrinketID, TrinketCD, PvPTrinketIcon)
-	else
-		Icon = Anchor[Num]
-		if ( Icon and Icon.Name == PvPTrinket[3] ) then
-			Stop(Icon)
-			Icon.Name = nil
-		end
-	end
-
-	-- Racial
-	local Racial = TPT.Default.Racial[Race]
-	if ( Racial ) then
-		if ( TPT.DB.Racial ) then
-			local RacialID, RacialCD, RacialName = Racial[1], Racial[2], Racial[3]
-			_, Num = IconSet(Anchor, Num, nil, Time, RacialName, RacialID, RacialCD, GetSpellTexture(RacialID))
+		-- PvP Trinket
+		local PvPTrinket = (Race == "Human") and TPT.Default.Trinket[2] or TPT.Default.Trinket[1]
+		if ( TPT.DB.Trinket ) then
+			local PvPTrinketIcon = (PLAYER_FACTION == "Alliance") and TRINKET_ALLIANCE or TRINKET_HORDE
+			local TrinketID, TrinketCD, TrinketName = PvPTrinket[1], PvPTrinket[2], PvPTrinket[3]
+			_, Num = IconSet(Anchor, Num, nil, Time, TrinketName, TrinketID, TrinketCD, PvPTrinketIcon)
 		else
 			Icon = Anchor[Num]
-			if ( Icon and Icon.ID == Racial[1] ) then
+			if ( Icon and Icon.Name == PvPTrinket[3] ) then
 				Stop(Icon)
 				Icon.Name = nil
 			end
 		end
-	end
 
-	-- All Spells
-	for Index, AbilityInfo in pairs(TPT.DB.Spells[Class]) do
-		local AbilityName = TPT.Default.SpellName[AbilityInfo[1]]
-		local AbilityStatus = AbilityInfo[3]
-		local AnchorSpec = Anchor.Spec
-
-		if ( AbilityStatus ~= false and (AnchorSpec and AnchorSpec[AbilityName] or not TPT.Default.Spec[AbilityName]) ) then
-			_, Num = IconSet(Anchor, Num, AbilityInfo, Time)
+		-- Racial
+		local Racial = TPT.Default.Racial[Race]
+		if ( Racial ) then
+			if ( TPT.DB.Racial ) then
+				local RacialID, RacialCD, RacialName = Racial[1], Racial[2], Racial[3]
+				_, Num = IconSet(Anchor, Num, nil, Time, RacialName, RacialID, RacialCD, GetSpellTexture(RacialID))
+			else
+				Icon = Anchor[Num]
+				if ( Icon and Icon.ID == Racial[1] ) then
+					Stop(Icon)
+					Icon.Name = nil
+				end
+			end
 		end
-	end
 
-	-- Icon Overflow
-	for i=Num,#Anchor do
-		Icon = Anchor[i]
-		Icon.Active = nil
-		Icon.Name = nil
-	end
+		-- All Spells
+		for Index, AbilityInfo in pairs(TPT.DB.Spells[Class]) do
+			local AbilityName = TPT.Default.SpellName[AbilityInfo[1]]
+			local AbilityStatus = AbilityInfo[3]
+			local AnchorSpec = Anchor.Spec
 
-	TPT:IconUpdate(i)
+			if ( AbilityStatus ~= false and (AnchorSpec and AnchorSpec[AbilityName] or not TPT.Default.Spec[AbilityName]) ) then
+				_, Num = IconSet(Anchor, Num, AbilityInfo, Time)
+			end
+		end
+
+		-- Icon Overflow
+		for i=Num,#Anchor do
+			Icon = Anchor[i]
+			Icon.Active = nil
+			Icon.Name = nil
+		end
+
+		TPT:IconUpdate(i)
+	end
 end
 
 --[[
@@ -537,11 +537,9 @@ local function QuerySpecInfo()
 	if ( not INSPECT_FRAME ) then
 		INSPECT_FRAME = CreateFrame("Frame")
 		INSPECT_FRAME:SetScript("OnEvent", function (Self, Event, ...)
-			if ( (InCombatLockdown()) or (InspectFrame and InspectFrame:IsShown()) or (not INSPECT_CURRENT) ) then return end
+			local Anchor = (INSPECT_CURRENT) and TPT.Anchors[INSPECT_CURRENT]
 
-			local Anchor = TPT.Anchors[INSPECT_CURRENT]
-
-			if ( not Anchor or not Anchor.Class ) then -- anchor not created
+			if ( InCombatLockdown() or (InspectFrame and InspectFrame:IsShown()) or not Anchor or not Anchor.Class or not Anchor.Active ) then
 				INSPECT_CURRENT = nil
 				return
 			end
@@ -680,9 +678,9 @@ local function GROUP_ROSTER_UPDATE_DELAY()
 			Anchor.Active = 1
 			Anchor:Show()
 		elseif ( Anchor.Active ) then
-			Anchor:Hide()
 			Anchor.Active = nil
 			StopAllIcons(i, true)
+			Anchor:Hide()
 		end
 	end
 

@@ -564,7 +564,7 @@ OFFSETS
 		'step', 0.01,
 		'default', 1,
 		'current', TPT.DB.OffY,
-		'setFunc', function(value) TPT.DB.OffY = value TPT:UpdateAllAnchors("Position") end,
+		'setFunc', function(value) TPT.DB.OffY = value UpdateAllAnchors("Position") end,
 		'currentTextFunc', function(value) return floor(value) end)
 	offsetY:SetPoint("LEFT", offsetX, "RIGHT", 20, 0)
 	offsetY:SetWidth(SliderWidth)
