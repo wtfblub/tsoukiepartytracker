@@ -310,32 +310,36 @@ local function Attach(Anchor)
 	for i=1, (CRF and 40 or TPT.PARTY_NUM) do
 		local AddOn
 
-		if ( not AddOn ) then -- Grid-L
-			AddOn = _G["Raid_Grid-LUnitButton"..i]
-		end
+		if ( CRF ) then -- CUF
+			AddOn = _G["CompactRaidFrame"..i]
 
-		if ( not AddOn )  then -- ElvUI
-			AddOn = _G["ElvUF_PartyGroup1UnitButton"..i]
-		end
-
-		if ( not AddOn )  then -- Tukui
-			AddOn = _G["TukuiPartyUnitButton"..i]
-		end
-
-		if ( not AddOn )  then -- SUF
-			AddOn = _G["SUFHeaderpartyUnitButton"..i]
-		end
-
-		if ( not AddOn )  then -- Grid
-			AddOn = _G["Grid2LayoutHeader1UnitButton"..i]
-		end
-
-		if ( not AddOn ) then -- CUF/Blizz Party
-			if ( CRF )  then
-				AddOn = _G["CompactRaidFrame"..i]
-			else
-				AddOn = _G["PartyMemberFrame"..i]
+			if ( not AddOn ) then
+				AddOn = _G["CompactPartyFrameMember"..i]
 			end
+		else
+			if ( not AddOn ) then -- Grid-L
+				AddOn = _G["Raid_Grid-LUnitButton"..i]
+			end
+
+			if ( not AddOn )  then -- ElvUI
+				AddOn = _G["ElvUF_PartyGroup1UnitButton"..i]
+			end
+
+			if ( not AddOn )  then -- Tukui
+				AddOn = _G["TukuiPartyUnitButton"..i]
+			end
+
+			if ( not AddOn )  then -- SUF
+				AddOn = _G["SUFHeaderpartyUnitButton"..i]
+			end
+
+			if ( not AddOn )  then -- Grid
+				AddOn = _G["Grid2LayoutHeader1UnitButton"..i]
+			end
+		end
+
+		if ( not AddOn ) then -- Fallback
+			AddOn = _G["PartyMemberFrame"..i]
 		end
 
 		if ( AddOn ) then
