@@ -711,20 +711,21 @@ function TPT:EnableCheck()
 end
 
 function TPT:GROUP_ROSTER_UPDATE(ZoneChanged)
-	local TPT_PARTY_NUM_PREVIOUS = TPT.PARTY_NUM or 0
+	local PartyPrevious = TPT.PARTY_NUM or 0
 	TPT.PARTY_NUM = GetNumSubgroupMembers()
 
-	local PartyChanged = TPT.PARTY_NUM ~= TPT_PARTY_NUM_PREVIOUS
-
-	if ( PartyChanged or ZoneChanged ) then
-		TPT:EnableCheck()
-	end
+	local PartyChanged = TPT.PARTY_NUM ~= PartyPrevious
+	if ( PartyChanged or ZoneChanged ) then TPT:EnableCheck() end
 
 	if ( ValidZoneType() ) then
 		if ( PartyChanged or CURRENT_ZONE_TYPE ~= PREVIOUS_ZONE_TYPE ) then
 			if ( not GROUP_ROSTER_UPDATE_DELAY_QUEUED ) then
-				TimerAfter(1, GROUP_ROSTER_UPDATE_DELAY)
-				GROUP_ROSTER_UPDATE_DELAY_QUEUED = 1
+				if ( TPT.PARTY_NUM > PartyPrevious ) then
+					TimerAfter(.5, GROUP_ROSTER_UPDATE_DELAY)
+					GROUP_ROSTER_UPDATE_DELAY_QUEUED = 1
+				else
+					GROUP_ROSTER_UPDATE_DELAY()
+				end
 			end
 
 			PREVIOUS_ZONE_TYPE = CURRENT_ZONE_TYPE
