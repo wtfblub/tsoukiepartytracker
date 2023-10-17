@@ -652,7 +652,13 @@ local function GetUnitByGUID(GUID)
 	end
 end
 
-local function GROUP_ROSTER_UPDATE_DELAY()
+local function GROUP_ROSTER_UPDATE_DELAY(Callback)
+	if ( not Callback ) then -- IS Callback
+		if ( CRF and InCombatLockdown() ) then
+			TPT:RegisterEvent("PLAYER_REGEN_ENABLED")
+		end
+	end
+
 	for i=1, 4 do
 		local Anchor = TPT.Anchors[i] or AnchorCreate(i)
 
@@ -714,6 +720,11 @@ function TPT:EnableCheck()
 	end
 end
 
+function TPT:PLAYER_REGEN_ENABLED()
+	GROUP_ROSTER_UPDATE_DELAY(1)
+	TPT:UnregisterEvent("PLAYER_REGEN_ENABLED")
+end
+
 function TPT:GROUP_ROSTER_UPDATE(ZoneChanged)
 	local PartyPrevious = TPT.PARTY_NUM or 0
 	TPT.PARTY_NUM = GetNumSubgroupMembers()
@@ -725,10 +736,10 @@ function TPT:GROUP_ROSTER_UPDATE(ZoneChanged)
 		if ( PartyChanged or CURRENT_ZONE_TYPE ~= PREVIOUS_ZONE_TYPE ) then
 			if ( not GROUP_ROSTER_UPDATE_DELAY_QUEUED ) then
 				if ( TPT.PARTY_NUM > PartyPrevious ) then
-					TimerAfter(.5, GROUP_ROSTER_UPDATE_DELAY)
+					TimerAfter(.8, GROUP_ROSTER_UPDATE_DELAY)
 					GROUP_ROSTER_UPDATE_DELAY_QUEUED = 1
 				else
-					GROUP_ROSTER_UPDATE_DELAY()
+					GROUP_ROSTER_UPDATE_DELAY(1)
 				end
 			end
 
