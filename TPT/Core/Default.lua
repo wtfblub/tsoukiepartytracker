@@ -261,6 +261,7 @@ TPT.Default.Spec = {
 	[47788] = 1, -- Guardian Spirit
 	[48086] = 1, -- Lightwell
 	[34861] = 1, -- Circle of Healing
+	[48172] = 1, -- Desperate Prayer
 
 -- WARLOCK
 	[48181] = 1, -- Haunt

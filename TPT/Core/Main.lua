@@ -630,10 +630,7 @@ end
 ]]
 
 local function ValidZoneType()
-	if (TPT.DB.Arena and CURRENT_ZONE_TYPE == "arena") or
-		(TPT.DB.Dungeon and CURRENT_ZONE_TYPE == "party") or
-		(((TPT.DB.World and CURRENT_ZONE_TYPE == "none") or (TPT.DB.Raid and (CURRENT_ZONE_TYPE == "raid" or CURRENT_ZONE_TYPE == "pvp"))) and (TPT.PARTY_NUM < 5 or not TPT.DB.Lock))
-	then
+	if ( TPT.PARTY_NUM > 0 and ((TPT.DB.Arena and CURRENT_ZONE_TYPE == "arena") or (TPT.DB.Dungeon and CURRENT_ZONE_TYPE == "party") or (((TPT.DB.World and CURRENT_ZONE_TYPE == "none") or (TPT.DB.Raid and (CURRENT_ZONE_TYPE == "raid" or CURRENT_ZONE_TYPE == "pvp"))) and (GetNumGroupMembers() < 5 or not TPT.DB.Lock))) ) then
 		return 1
 	end
 end
@@ -652,8 +649,8 @@ local function GetUnitByGUID(GUID)
 	end
 end
 
-local function GROUP_ROSTER_UPDATE_DELAY(Callback)
-	if ( not Callback ) then -- IS Callback
+local function GROUP_ROSTER_UPDATE_DELAY(Timed)
+	if ( Timed ~= false ) then
 		if ( CRF and InCombatLockdown() ) then
 			TPT:RegisterEvent("PLAYER_REGEN_ENABLED")
 		end
@@ -670,7 +667,7 @@ local function GROUP_ROSTER_UPDATE_DELAY(Callback)
 				TPT:AnchorUpdate(i)
 				TPT:AnchorUpdatePosition(i)
 
-				-- Cleanse Stale GUIDs
+				-- Cleanse GUIDs
 				for GUID in pairs(GUID_ACTIVE) do
 					if ( not GetUnitByGUID(GUID) ) then
 						GUID_ACTIVE[GUID] = nil
@@ -680,8 +677,10 @@ local function GROUP_ROSTER_UPDATE_DELAY(Callback)
 				INSPECT_CURRENT = nil
 				QUERY_SPEC_TICK_TIMEOUT = nil
 				TPT:QuerySpecStart()
-			elseif ( not Anchor.Active ) then
-				TPT:IconUpdate(i)
+			else
+				if ( not Anchor.Active ) then
+					TPT:IconUpdate(i)
+				end
 				TPT:AnchorUpdatePosition(i)
 			end
 
@@ -698,7 +697,7 @@ local function GROUP_ROSTER_UPDATE_DELAY(Callback)
 end
 
 function TPT:EnableCheck()
-	if ( ValidZoneType() and TPT.PARTY_NUM > 0 ) then
+	if ( ValidZoneType() ) then
 		if ( not TPT.ENABLED ) then
 			TPT.ENABLED = 1
 
@@ -721,25 +720,28 @@ function TPT:EnableCheck()
 end
 
 function TPT:PLAYER_REGEN_ENABLED()
-	GROUP_ROSTER_UPDATE_DELAY(1)
+	GROUP_ROSTER_UPDATE_DELAY(false)
 	TPT:UnregisterEvent("PLAYER_REGEN_ENABLED")
 end
 
-function TPT:GROUP_ROSTER_UPDATE(ZoneChanged)
+function TPT:PARTY_CONVERTED_TO_RAID()
+	TPT:GROUP_ROSTER_UPDATE("Convert")
+end
+
+function TPT:GROUP_ROSTER_UPDATE(UpdateType)
 	local PartyPrevious = TPT.PARTY_NUM or 0
 	TPT.PARTY_NUM = GetNumSubgroupMembers()
 
-	local PartyChanged = TPT.PARTY_NUM ~= PartyPrevious
-	if ( PartyChanged or ZoneChanged ) then TPT:EnableCheck() end
+	if ( ((TPT.PARTY_NUM == 0 and PartyPrevious > 0) or (TPT.PARTY_NUM > 0 and PartyPrevious == 0)) or UpdateType == "Zone" ) then TPT:EnableCheck() end
 
-	if ( ValidZoneType() ) then
-		if ( PartyChanged or CURRENT_ZONE_TYPE ~= PREVIOUS_ZONE_TYPE ) then
+	if ( TPT.PARTY_NUM ~= PartyPrevious or UpdateType == "Convert" or CURRENT_ZONE_TYPE ~= PREVIOUS_ZONE_TYPE ) then
+		if ( ValidZoneType() ) then
 			if ( not GROUP_ROSTER_UPDATE_DELAY_QUEUED ) then
-				if ( TPT.PARTY_NUM > PartyPrevious ) then
-					TimerAfter(.8, GROUP_ROSTER_UPDATE_DELAY)
-					GROUP_ROSTER_UPDATE_DELAY_QUEUED = 1
+				if ( TPT.PARTY_NUM < PartyPrevious ) then
+					GROUP_ROSTER_UPDATE_DELAY(false)
 				else
-					GROUP_ROSTER_UPDATE_DELAY(1)
+					TimerAfter(.6, GROUP_ROSTER_UPDATE_DELAY)
+					GROUP_ROSTER_UPDATE_DELAY_QUEUED = 1
 				end
 			end
 
@@ -782,6 +784,7 @@ local function OnLoad()
 	GUID_ACTIVE = {}
 
 	TPT:RegisterEvent("GROUP_ROSTER_UPDATE")
+	TPT:RegisterEvent("PARTY_CONVERTED_TO_RAID")
 end
 
 function TPT:PLAYER_ENTERING_WORLD()
@@ -803,7 +806,7 @@ function TPT:PLAYER_ENTERING_WORLD()
 			StopAllIcons()
 		end
 
-		TPT:GROUP_ROSTER_UPDATE(1)
+		TPT:GROUP_ROSTER_UPDATE("Zone")
 	end
 end
 
