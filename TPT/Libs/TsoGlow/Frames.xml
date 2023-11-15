@@ -3,7 +3,7 @@
 		<Layers>
 			<Layer level="OVERLAY">
 				<!-- Zoom, Border, White -->
-				<Texture parentKey="A" file="Interface\AddOns\TPT\libs\TsoGlow\Border">
+				<Texture parentKey="A" file="Interface\AddOns\TPT\Libs\TsoGlow\Border">
 					<Size x="42" y="41"/>
 					<Anchors>
 						<Anchor point="CENTER"/>
@@ -15,7 +15,7 @@
 						</AnimationGroup>
 					</Animations>
 				</Texture>
-				<Texture parentKey="B" file="Interface\AddOns\TPT\libs\TsoGlow\Border">
+				<Texture parentKey="B" file="Interface\AddOns\TPT\Libs\TsoGlow\Border">
 					<Size x="58" y="57"/>
 					<Anchors>
 						<Anchor point="CENTER"/>
@@ -27,7 +27,7 @@
 						</AnimationGroup>
 					</Animations>
 				</Texture>
-				<Texture parentKey="C" file="Interface\AddOns\TPT\libs\TsoGlow\White" alpha="0">
+				<Texture parentKey="C" file="Interface\AddOns\TPT\Libs\TsoGlow\White" alpha="0">
 					<Size x="58" y="57"/>
 					<Anchors>
 						<Anchor point="CENTER"/>
@@ -66,7 +66,7 @@
 	<Frame name="TGlow" setAllPoints="true" virtual="true">
 		<Layers>
 			<Layer level="ARTWORK">
-				<Texture parentKey="B" file="Interface\AddOns\TPT\libs\TsoGlow\Border">
+				<Texture parentKey="B" file="Interface\AddOns\TPT\Libs\TsoGlow\Border">
 					<Size x="58" y="57"/>
 					<Anchors>
 						<Anchor point="CENTER"/>
@@ -75,7 +75,7 @@
 				</Texture>
 			</Layer>
 			<Layer level="OVERLAY">
-				<Texture parentKey="A" file="Interface\AddOns\TPT\libs\TsoGlow\Ants">
+				<Texture parentKey="A" file="Interface\AddOns\TPT\Libs\TsoGlow\Ants">
 					<Size x="44" y="44"/>
 					<Anchors>
 						<Anchor point="CENTER"/>

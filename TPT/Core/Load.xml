@@ -1,7 +1,5 @@
 <Ui>
 	<Script file="Init.lua"/>
-	<Script file="Default.lua"/>
-	<Script file="Locale.lua"/>
-	<Script file="Options.lua"/>
+	<Include file="Options\Load.xml"/>
 	<Script file="Main.lua"/>
 </Ui>

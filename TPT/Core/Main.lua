@@ -91,7 +91,7 @@ end
 
 ]]
 
-local function Active(Icon, Start)
+local function Resume(Icon, Start)
 	local GUID = Icon.GUID
 	local AbilityName = Icon.Name
 	local Unit = GUID_ACTIVE[GUID]
@@ -113,20 +113,20 @@ local function Active(Icon, Start)
 end
 
 local function Stop(Icon)
-	local StartTime, StartUnit = Active(Icon)
-
-	if ( Icon.Active or StartTime ) then
-		if ( StartTime ) then
-			StartUnit[Icon.Name] = nil
+	if ( Icon.Name ) then
+		local ResumeTime, ResumeUnit = Resume(Icon)
+		if ( Icon.Active or ResumeTime ) then
+			if ( ResumeTime ) then ResumeUnit[Icon.Name] = nil end
+			CooldownFrame_Set(Icon.Swipe, 0, 0, 0)
 		end
 
-		CooldownFrame_Set(Icon.Swipe, 0, 0, 0)
+		Icon.Active = nil
 	end
 end
 
 local function Start(Anchor, Icon, SetCD)
 	if ( Icon.Name ) then
-		CooldownFrame_Set(Icon.Swipe, Active(Icon, GetTime()), SetCD or Icon.CD, 1)
+		CooldownFrame_Set(Icon.Swipe, Resume(Icon, GetTime()), SetCD or Icon.CD, 1)
 
 		Icon.Active = 1
 
@@ -159,22 +159,18 @@ function TPT:IconUpdate(i)
 
 	for Index=1,#Anchor do
 		local Icon = Anchor[Index]
-		local StartTime
+		local ResumeTime = (TPT.DB.Hidden and not Icon.Active) and Resume(Icon)
 
-		if ( TPT.DB.Hidden and not Icon.Active ) then
-			StartTime = Active(Icon)
-		end
-
-		if ( Icon and Icon.Name and (not TPT.DB.Hidden or Icon.Active or (StartTime and (Time - StartTime) < Icon.CD)) ) then
+		if ( Icon and Icon.Name and (not TPT.DB.Hidden or Icon.Active or (ResumeTime and (Time - ResumeTime) < Icon.CD)) ) then
 			Icon:ClearAllPoints()
 
 			if TPT.DB.Rows then
 				if ( Count == 1 ) then
 					Icon:SetPoint(TPT.DB.Left and "TOPRIGHT" or "TOPLEFT", Anchor, TPT.DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", TPT.DB.Left and -1 * TPT.DB.SpaceX or TPT.DB.SpaceX, 0)
 				elseif ( Count % 2 == 0 ) then
-					Icon:SetPoint(TPT.DB.Left and "TOP" or "TOP", Anchor[LastIndex], TPT.DB.Left and "BOTTOM" or "BOTTOM", TPT.DB.Left and 0 or 0, -1 * TPT.DB.SpaceY )			
+					Icon:SetPoint(TPT.DB.Left and "TOP" or "TOP", Anchor[LastIndex], TPT.DB.Left and "BOTTOM" or "BOTTOM", TPT.DB.Left and 0 or 0, -1 * TPT.DB.SpaceX )			
 				else
-					Icon:SetPoint(TPT.DB.Left and "BOTTOMRIGHT" or "BOTTOMLEFT", Anchor[LastIndex], TPT.DB.Left and "TOPLEFT" or "TOPRIGHT", TPT.DB.Left and -1 * TPT.DB.SpaceX or TPT.DB.SpaceX, TPT.DB.SpaceY)
+					Icon:SetPoint(TPT.DB.Left and "BOTTOMRIGHT" or "BOTTOMLEFT", Anchor[LastIndex], TPT.DB.Left and "TOPLEFT" or "TOPRIGHT", TPT.DB.Left and -1 * TPT.DB.SpaceX or TPT.DB.SpaceX, TPT.DB.SpaceX)
 				end
 			else
 				if ( Count == 1 ) then	
@@ -206,7 +202,7 @@ local function TooltipOnLeave(Self)
 	end
 end
 
-local function Cooldown_OnHide(Self)
+local function CooldownOnHide(Self)
 	local Icon = Self:GetParent()
 
 	GlowHide(Icon)
@@ -229,7 +225,7 @@ local function IconCreate(Anchor)
 	Icon.Texture = Texture
 
 	Icon:EnableMouse()
-	Swipe:HookScript("OnHide", Cooldown_OnHide)
+	Swipe:HookScript("OnHide", CooldownOnHide)
 	Icon:SetScript("OnEnter", TooltipOnEnter)
 	Icon:SetScript("OnLeave", TooltipOnLeave)
 
@@ -262,10 +258,11 @@ local function IconSet(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 		Icon.Texture:SetTexCoord(0.07, 0.9, 0.07, 0.90)
 	end
 
-	local StartTime = Active(Icon)
-	if ( (StartTime and (Time - StartTime) < CD) ) then
+	-- Group Shuffle
+	local ResumeTime = Resume(Icon)
+	if ( (ResumeTime and (Time - ResumeTime) < CD) ) then
 		GlowHide(Icon)
-		CooldownFrame_Set(Icon.Swipe, StartTime, CD, 1)
+		CooldownFrame_Set(Icon.Swipe, ResumeTime, CD, 1)
 		Icon.Active = 1
 	elseif ( Icon.Active ) then
 		Stop(Icon)
@@ -305,47 +302,24 @@ local function Attach(Anchor)
 	local GUID = UnitGUID(Anchor.Unit)
 	if ( not GUID ) then return end
 
-	local Frame
+	local AddOn
 
-	for i=1, (CRF and 40 or TPT.PARTY_NUM) do
-		local AddOn
-
-		if ( CRF ) then -- CUF
-			AddOn = _G["CompactRaidFrame"..i]
-
-			if ( not AddOn ) then
-				AddOn = _G["CompactPartyFrameMember"..i]
+	if ( CRF ) then
+		if ( CompactRaidFrameManager_GetSetting("KeepGroupsTogether") ) then
+			if ( IsInRaid() ) then
+				AddOn = "CompactRaidGroup1Member"
+			else
+				AddOn = "CompactPartyFrameMember"
 			end
 		else
-			if ( not AddOn ) then -- Grid-L
-				AddOn = _G["Raid_Grid-LUnitButton"..i]
-			end
-
-			if ( not AddOn )  then -- ElvUI
-				AddOn = _G["ElvUF_PartyGroup1UnitButton"..i]
-			end
-
-			if ( not AddOn )  then -- Tukui
-				AddOn = _G["TukuiPartyUnitButton"..i]
-			end
-
-			if ( not AddOn )  then -- SUF
-				AddOn = _G["SUFHeaderpartyUnitButton"..i]
-			end
-
-			if ( not AddOn )  then -- Grid
-				AddOn = _G["Grid2LayoutHeader1UnitButton"..i]
-			end
+			AddOn = "CompactRaidFrame"
 		end
+	else
+		AddOn = "PartyMemberFrame"
+	end
 
-		if ( not AddOn ) then -- Fallback
-			AddOn = _G["PartyMemberFrame"..i]
-		end
-
-		if ( AddOn ) then
-			Frame = AddOn
-		end
-
+	for i=1, (CRF and 40 or TPT.PARTY_NUM) do
+		local Frame = _G[AddOn..i]
 		if ( Frame and not Frame:IsForbidden() ) then
 			if ( Frame.unit and UnitGUID(Frame.unit) == GUID ) then
 				return Frame
@@ -357,7 +331,7 @@ end
 function TPT:AnchorUpdatePosition(i)
 	local Point, Relative, X, Y
 	local Anchor = TPT.Anchors[i]
-	local Parent = (TPT.DB.Attach) and Attach(Anchor) or nil
+	local Parent = (TPT.DB.Attach) and Attach(Anchor)
 
 	Anchor:ClearAllPoints()
 
@@ -630,7 +604,7 @@ end
 ]]
 
 local function ValidZoneType()
-	if ( TPT.PARTY_NUM > 0 and ((TPT.DB.Arena and CURRENT_ZONE_TYPE == "arena") or (TPT.DB.Dungeon and CURRENT_ZONE_TYPE == "party") or (((TPT.DB.World and CURRENT_ZONE_TYPE == "none") or (TPT.DB.Raid and (CURRENT_ZONE_TYPE == "raid" or CURRENT_ZONE_TYPE == "pvp"))) and (GetNumGroupMembers() < 5 or not TPT.DB.Lock))) ) then
+	if ( (TPT.DB.Arena and CURRENT_ZONE_TYPE == "arena") or (((TPT.DB.Dungeon and (CURRENT_ZONE_TYPE == "party" or CURRENT_ZONE_TYPE == "raid")) or (TPT.DB.World and CURRENT_ZONE_TYPE == "none")) and GetNumGroupMembers() < 5) ) then
 		return 1
 	end
 end
@@ -697,7 +671,7 @@ local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 end
 
 function TPT:EnableCheck()
-	if ( ValidZoneType() ) then
+	if ( ValidZoneType() and TPT.PARTY_NUM > 0 ) then
 		if ( not TPT.ENABLED ) then
 			TPT.ENABLED = 1
 
@@ -732,9 +706,11 @@ function TPT:GROUP_ROSTER_UPDATE(UpdateType)
 	local PartyPrevious = TPT.PARTY_NUM or 0
 	TPT.PARTY_NUM = GetNumSubgroupMembers()
 
-	if ( ((TPT.PARTY_NUM == 0 and PartyPrevious > 0) or (TPT.PARTY_NUM > 0 and PartyPrevious == 0)) or UpdateType == "Zone" ) then TPT:EnableCheck() end
+	if ( TPT.PARTY_NUM ~= PartyPrevious or UpdateType == "Convert" or UpdateType == "Zone" ) then
+		if ( ((TPT.PARTY_NUM == 0 and PartyPrevious > 0) or (TPT.PARTY_NUM > 0 and PartyPrevious == 0)) or UpdateType == "Zone" ) then
+			TPT:EnableCheck()
+		end
 
-	if ( TPT.PARTY_NUM ~= PartyPrevious or UpdateType == "Convert" or CURRENT_ZONE_TYPE ~= PREVIOUS_ZONE_TYPE ) then
 		if ( ValidZoneType() ) then
 			if ( not GROUP_ROSTER_UPDATE_DELAY_QUEUED ) then
 				if ( TPT.PARTY_NUM < PartyPrevious ) then
@@ -751,13 +727,7 @@ function TPT:GROUP_ROSTER_UPDATE(UpdateType)
 end
 
 local function OnLoad()
-	if ( not TPTDB or not TPTDB.V or TPT.Version ~= TPTDB.V ) then
-		print("|cffFF4500/tpt")
-		TPTDB = { Spells = TPT.Default.Spells, Position = {}, Scale = 1, OffY = 2, OffX = 5, SpaceX = 0, SpaceY = 0, Glow = 1, V = TPT.Version, Border = true, World = true, Arena = true, Trinket = true, Racial = true }
-	end
-	TPT.DB = TPTDB
-
-	TPT:Locale()
+	TPT.Options()
 
 	HEX = GetSpellInfo(51514)
 	FERAL_CHARGE = GetSpellInfo(49377)
@@ -768,18 +738,15 @@ local function OnLoad()
 	TRINKET_ALLIANCE = GetItemIcon(18854)
 	TRINKET_HORDE = GetItemIcon(18849)
 
-	-- Init Options
-	local _, AddonTitle = GetAddOnInfo(AddOn)
-	local SO = LibStub("LibSimpleOptions-1.0")
-	SO.AddOptionsPanel(AddonTitle, TPT.Options.Build)
-	SO.AddSlashCommand(AddonTitle, "/tpt")
-
 	TPT.Anchors:Lock()
 	TPT.Icons:SetScale(TPT.DB.Scale or 1)
 	TPT.Icons:Hide()
 	TPT.Anchors:Hide()
 
 	CRF = CompactRaidFrameContainer or CompactRaidFrameDB
+	if ( CRF ) then
+		hooksecurefunc("CompactRaidFrameManagerDisplayFrameProfileSelector_OnClick", GROUP_ROSTER_UPDATE_DELAY)
+	end
 
 	GUID_ACTIVE = {}
 
@@ -803,6 +770,7 @@ function TPT:PLAYER_ENTERING_WORLD()
 		TPT:QuerySpecStop()
 
 		if ( CURRENT_ZONE_TYPE == "arena" ) then
+			TPT.PARTY_NUM = 0
 			StopAllIcons()
 		end
 

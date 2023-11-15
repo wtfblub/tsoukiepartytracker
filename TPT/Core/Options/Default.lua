@@ -1,6 +1,6 @@
 local AddOn, TPT, Private = select(2, ...):Init()
 
-TPT.Version = 1
+TPT.Version = 2
 
 TPT.Default = {}
 
