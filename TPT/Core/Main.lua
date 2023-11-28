@@ -638,7 +638,10 @@ local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 				if ( not Anchor.Active ) then
 					TPT:IconUpdate(i)
 				end
-				TPT:AnchorUpdatePosition(i)
+
+				if ( TPT.DB.Attach ) then
+					TPT:AnchorUpdatePosition(i)
+				end
 			end
 
 			Anchor.Active = 1
