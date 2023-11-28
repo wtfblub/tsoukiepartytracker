@@ -603,7 +603,9 @@ local function AnchorShuffle(Anchor, GUID)
 	end
 
 	-- No Shuffle
-	StopAllIcons(Index)
+	if ( CURRENT_ZONE_TYPE ~= "arena" ) then
+		StopAllIcons(Index)
+	end
 
 	return Anchor
 end
