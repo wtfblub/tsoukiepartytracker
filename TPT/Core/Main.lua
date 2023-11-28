@@ -35,8 +35,6 @@ local RACIAL_UNDEAD
 local TRINKET_ALLIANCE
 local TRINKET_HORDE
 
-local GUID_ACTIVE
-
 TPT.Icons = CreateFrame("Frame", nil, UIParent)
 TPT.Anchors = CreateFrame("Frame", nil, UIParent)
 
@@ -91,44 +89,13 @@ end
 
 ]]
 
-local function Resume(Icon, Start)
-	local GUID = Icon.GUID
-	local AbilityName = Icon.Name
-	local Unit = GUID_ACTIVE[GUID]
-
-	-- Unit
-	if ( Start and not Unit ) then
-		Unit = {}
-		GUID_ACTIVE[GUID] = Unit
-	end
-
-	-- Start
-	if ( Start ) then
-		Unit[AbilityName] = Start
-	elseif ( Unit ) then
-		Start = Unit[AbilityName]
-	end
-
-	return Start, Unit
-end
-
 local function Stop(Icon)
-	if ( Icon.Name ) then
-		local ResumeTime, ResumeUnit = Resume(Icon)
-		if ( Icon.Active or ResumeTime ) then
-			if ( ResumeTime ) then ResumeUnit[Icon.Name] = nil end
-			CooldownFrame_Set(Icon.Swipe, 0, 0, 0)
-		end
-
-		Icon.Active = nil
-	end
+	CooldownFrame_Set(Icon.Swipe, 0, 0, 0)
 end
 
 local function Start(Anchor, Icon, SetCD)
 	if ( Icon.Name ) then
-		CooldownFrame_Set(Icon.Swipe, Resume(Icon, GetTime()), SetCD or Icon.CD, 1)
-
-		Icon.Active = 1
+		CooldownFrame_Set(Icon.Swipe, GetTime(), SetCD or Icon.CD, 1)
 
 		if ( TPT.DB.Glow ) then
 			if ( not Icon.Flash ) then
@@ -159,12 +126,11 @@ function TPT:IconUpdate(i)
 
 	for Index=1,#Anchor do
 		local Icon = Anchor[Index]
-		local ResumeTime = (TPT.DB.Hidden and not Icon.Active) and Resume(Icon)
 
-		if ( Icon and Icon.Name and (not TPT.DB.Hidden or Icon.Active or (ResumeTime and (Time - ResumeTime) < Icon.CD)) ) then
+		if ( Icon and Icon.Name and (not TPT.DB.Hidden or Icon.Swipe:IsShown()) ) then
 			Icon:ClearAllPoints()
 
-			if TPT.DB.Rows then
+			if ( TPT.DB.Rows ) then
 				if ( Count == 1 ) then
 					Icon:SetPoint(TPT.DB.Left and "TOPRIGHT" or "TOPLEFT", Anchor, TPT.DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", TPT.DB.Left and -1 * TPT.DB.SpaceX or TPT.DB.SpaceX, 0)
 				elseif ( Count % 2 == 0 ) then
@@ -204,9 +170,7 @@ end
 
 local function CooldownOnHide(Self)
 	local Icon = Self:GetParent()
-
 	GlowHide(Icon)
-	Icon.Active = nil
 
 	if ( TPT.DB.Hidden and Icon.Anchor.Active ) then
 		TPT:IconUpdate(Icon.Anchor.i)
@@ -256,16 +220,6 @@ local function IconSet(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 		Icon.Texture:SetTexCoord(0, 1, 0, 1)
 	else
 		Icon.Texture:SetTexCoord(0.07, 0.9, 0.07, 0.90)
-	end
-
-	-- Group Shuffle
-	local ResumeTime = Resume(Icon)
-	if ( (ResumeTime and (Time - ResumeTime) < CD) ) then
-		GlowHide(Icon)
-		CooldownFrame_Set(Icon.Swipe, ResumeTime, CD, 1)
-		Icon.Active = 1
-	elseif ( Icon.Active ) then
-		Stop(Icon)
 	end
 
 	return Icon, (Num + 1)
@@ -392,8 +346,7 @@ end
 
 function AnchorCreate(i)
 	local Anchor = CreateFrame("Frame", nil, TPT.Anchors)
-		Anchor:SetHeight(15)
-		Anchor:SetWidth(15)
+		Anchor:SetSize(15, 15)
 		Anchor:EnableMouse(true)
 		Anchor:SetMovable(true)
 		Anchor:Hide()
@@ -409,6 +362,7 @@ function AnchorCreate(i)
 	local Index = Anchor:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 		Index:SetPoint("CENTER")
 		Index:SetText(i)
+		Anchor.Text = Index
 
 	return Anchor
 end
@@ -473,7 +427,6 @@ function TPT:AnchorUpdate(i)
 		-- Icon Overflow
 		for i=Num,#Anchor do
 			Icon = Anchor[i]
-			Icon.Active = nil
 			Icon.Name = nil
 		end
 
@@ -623,6 +576,38 @@ local function GetUnitByGUID(GUID)
 	end
 end
 
+local function AnchorShuffle(Anchor, GUID)
+	local Index = Anchor.i
+	local Anchors = TPT.Anchors
+
+	for i=1,#Anchors do
+		local Found = Anchors[i]
+
+		if ( Found.GUID and Found.GUID == GUID and i ~= Index ) then
+			local Unit = Found.Unit
+
+			Anchors[Index] = Found
+			Anchors[i] = Anchor
+
+			Found.Unit = Anchor.Unit
+			Anchor.Unit = Unit
+			Found.i = Index
+			Anchor.i = i
+			Anchor.Active = Found.Active
+
+			Found.Text:SetText(Index)
+			Anchor.Text:SetText(i)
+
+			return Found
+		end
+	end
+
+	-- No Shuffle
+	StopAllIcons(Index)
+
+	return Anchor
+end
+
 local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 	if ( Timed ~= false ) then
 		if ( CRF and InCombatLockdown() ) then
@@ -630,23 +615,21 @@ local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 		end
 	end
 
-	for i=1, 4 do
+	for i=1,4 do
 		local Anchor = TPT.Anchors[i] or AnchorCreate(i)
 
 		if ( i <= TPT.PARTY_NUM ) then
 			local UnitGUID = UnitGUID(Anchor.Unit)
+			local UnitChange = Anchor.GUID and Anchor.GUID ~= UnitGUID
 
-			if ( (UnitGUID and not Anchor.Spec and not INSPECT_CURRENT) or (Anchor.GUID ~= UnitGUID) ) then
+			if ( UnitChange or (not Anchor.Spec and not INSPECT_CURRENT) ) then
+				if ( UnitChange ) then
+					Anchor = AnchorShuffle(Anchor, UnitGUID)
+				end
+
 				Anchor.Spec = nil
 				TPT:AnchorUpdate(i)
 				TPT:AnchorUpdatePosition(i)
-
-				-- Cleanse GUIDs
-				for GUID in pairs(GUID_ACTIVE) do
-					if ( not GetUnitByGUID(GUID) ) then
-						GUID_ACTIVE[GUID] = nil
-					end
-				end
 
 				INSPECT_CURRENT = nil
 				QUERY_SPEC_TICK_TIMEOUT = nil
@@ -748,8 +731,6 @@ local function OnLoad()
 		hooksecurefunc("CompactRaidFrameManagerDisplayFrameProfileSelector_OnClick", GROUP_ROSTER_UPDATE_DELAY)
 	end
 
-	GUID_ACTIVE = {}
-
 	TPT:RegisterEvent("GROUP_ROSTER_UPDATE")
 	TPT:RegisterEvent("PARTY_CONVERTED_TO_RAID")
 end
@@ -793,7 +774,7 @@ local function TriggerCooldown(SpellName, Anchor)
 			if ( Anchor.Race == "Scourge" ) then
 				local Trinket = TPT.Default.Trinket[1][3]
 				if ( (Icon.Name == RACIAL_UNDEAD and SpellName == Trinket) or (Icon.Name == Trinket and SpellName == RACIAL_UNDEAD) ) then
-					if ( not Icon.Active ) then
+					if ( not Icon.Swipe:IsShown() ) then
 						Start(Anchor, Icon, 45)
 					end
 				end
