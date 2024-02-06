@@ -393,7 +393,7 @@ function TPT.OptionOnLoad(Self, AddonName)
 			OffsetX = TPT.CreateSlider(Panel, "Attach Offset: X",
 				-50, 50, 1,
 				"", "",
-				function(_, Value) return StringFormat("%.1f", Value) end,
+				function(_, Value) return Value end,
 				function() return TPT.DB.OffX end,
 				function(_, Value) Update("Position", "OffX", Value) end,
 				nil, true)
@@ -402,7 +402,7 @@ function TPT.OptionOnLoad(Self, AddonName)
 			OffsetY = TPT.CreateSlider(Panel, "Attach Offset: Y",
 				-50, 50, 1,
 				"", "",
-				function(_, Value) return StringFormat("%.1f", Value) end,
+				function(_, Value) return Value end,
 				function() return TPT.DB.OffY end,
 				function(_, Value) Update("Position", "OffY", Value) end,
 				nil, true)
