@@ -1,5 +1,6 @@
 local AddOn, TPT, Private = select(2, ...):Init()
 
+local _G = _G
 local GetTime = GetTime
 local UIParent = UIParent
 local UnitGUID = UnitGUID
@@ -16,15 +17,14 @@ local GetSpellTexture = C_GetSpellTexture or GetSpellTexture
 local CURRENT_ZONE_TYPE
 local PREVIOUS_ZONE_TYPE
 
-local CRF
-
-local INSPECT_FRAME
-local INSPECT_CURRENT
+local QUERY_SPEC_FRAME
+local QUERY_SPEC_CURRENT
 local QUERY_SPEC_TICK
 local QUERY_SPEC_TICK_TIMEOUT
 local GROUP_ROSTER_UPDATE_DELAY_QUEUED
 
 local PLAYER_FACTION
+local UNIT_FRAME
 
 local HEX
 local FERAL_CHARGE
@@ -229,7 +229,7 @@ local function StopAllIcons(Anchor, Hide)
 	for i=(Anchor or 1), (Anchor or #TPT.Anchors) do
 		local Icons = TPT.Anchors[i]
 
-		for k=1, #Icons do
+		for k=1,#Icons do
 			local Icon = Icons[k]
 
 			GlowHide(Icon)
@@ -254,29 +254,27 @@ end
 
 local function Attach(Anchor)
 	local GUID = UnitGUID(Anchor.Unit)
-	if ( not GUID ) then return end
+	if ( GUID ) then
+		local AddOn = UNIT_FRAME
 
-	local AddOn
-
-	if ( CRF ) then
-		if ( CompactRaidFrameManager_GetSetting("KeepGroupsTogether") ) then
-			if ( IsInRaid() ) then
-				AddOn = "CompactRaidGroup1Member"
-			else
-				AddOn = "CompactPartyFrameMember"
+		if ( UNIT_FRAME == "CompactRaidFrame" ) then
+			if ( CompactRaidFrameManager_GetSetting("KeepGroupsTogether") ) then
+				if ( IsInRaid() ) then
+					AddOn = "CompactRaidGroup1Member"
+				else
+					AddOn = "CompactPartyFrameMember"
+				end
 			end
-		else
-			AddOn = "CompactRaidFrame"
 		end
-	else
-		AddOn = "PartyMemberFrame"
-	end
 
-	for i=1, (CRF and 40 or TPT.PARTY_NUM) do
-		local Frame = _G[AddOn..i]
-		if ( Frame and not Frame:IsForbidden() ) then
-			if ( Frame.unit and UnitGUID(Frame.unit) == GUID ) then
-				return Frame
+		for i=1, (UNIT_FRAME == "CompactRaidFrame" and 40 or TPT.PARTY_NUM + 1) do
+			local Frame = _G[AddOn..i]
+
+			if ( Frame and not Frame:IsForbidden() ) then
+				local Unit = Frame.unit or Frame.partyid
+				if ( Unit and UnitGUID(Unit) == GUID ) then
+					return Frame
+				end
 			end
 		end
 	end
@@ -300,10 +298,11 @@ function TPT:AnchorUpdatePosition(i)
 		X = TPT.DB.OffX
 		Y = TPT.DB.OffY
 	else
-		if ( TPT.DB.Position[i] ) then
+		local Position = TPT.DB.Position[i]
+		if ( Position ) then
 			local Scale = Anchor:GetEffectiveScale()
-			X = TPT.DB.Position[i].X/Scale
-			Y = TPT.DB.Position[i].Y/Scale
+			X = Position.X/Scale
+			Y = Position.Y/Scale
 			Point = "TOPLEFT"
 		else
 			Point = "CENTER"
@@ -321,14 +320,16 @@ local function AnchorPositionSave(i)
 	local UIParentTop = UIParent:GetTop()
 
 	local Anchor = TPT.Anchors[i]
+	local Position = TPT.DB.Position[i]
 
-	if ( not TPT.DB.Position[i] ) then
-		TPT.DB.Position[i] = {}
+	if ( not Position ) then
+		Position = {}
+		TPT.DB.Position[i] = Position
 	end
 
 	local Scale = Anchor:GetEffectiveScale()
-	TPT.DB.Position[i].X = Anchor:GetLeft() * Scale 
-	TPT.DB.Position[i].Y = (Anchor:GetTop() * Scale) - (UIParentTop * UIParentScale)
+	Position.X = Anchor:GetLeft() * Scale 
+	Position.Y = (Anchor:GetTop() * Scale) - (UIParentTop * UIParentScale)
 end
 
 local function AnchorOnMouseDown(Self, Button)
@@ -370,7 +371,6 @@ end
 function TPT:AnchorUpdate(i)
 	local Anchor = TPT.Anchors[i]
 	local Unit = Anchor.Unit
-
 	local _, Class = UnitClass(Unit)
 
 	if ( Class ) then
@@ -379,20 +379,21 @@ function TPT:AnchorUpdate(i)
 		local Icon
 		local Num = 1
 		local Time = GetTime()
+		local Spec = Anchor.Spec
 
 		Anchor.GUID = UnitGUID(Unit)
 		Anchor.Class = Class
 		Anchor.Race = Race
 
 		-- PvP Trinket
-		local PvPTrinket = (Race == "Human") and TPT.Default.Trinket[2] or TPT.Default.Trinket[1]
+		local Trinket = (Race == "Human") and TPT.Default.Trinket[2] or TPT.Default.Trinket[1]
 		if ( TPT.DB.Trinket ) then
-			local PvPTrinketIcon = (PLAYER_FACTION == "Alliance") and TRINKET_ALLIANCE or TRINKET_HORDE
-			local TrinketID, TrinketCD, TrinketName = PvPTrinket[1], PvPTrinket[2], PvPTrinket[3]
-			_, Num = IconSet(Anchor, Num, nil, Time, TrinketName, TrinketID, TrinketCD, PvPTrinketIcon)
+			local TrinketIcon = (PLAYER_FACTION == "Alliance") and TRINKET_ALLIANCE or TRINKET_HORDE
+			local TrinketID, TrinketCD, TrinketName = Trinket[1], Trinket[2], Trinket[3]
+			_, Num = IconSet(Anchor, Num, nil, Time, TrinketName, TrinketID, TrinketCD, TrinketIcon)
 		else
 			Icon = Anchor[Num]
-			if ( Icon and Icon.Name == PvPTrinket[3] ) then
+			if ( Icon and Icon.Name == Trinket[3] ) then
 				Stop(Icon)
 				Icon.Name = nil
 			end
@@ -414,12 +415,13 @@ function TPT:AnchorUpdate(i)
 		end
 
 		-- All Spells
-		for Index, AbilityInfo in pairs(TPT.DB.Spells[Class]) do
+		local All = TPT.DB.Spells[Class]
+		for i=1,#All do
+			local AbilityInfo = All[i]
 			local AbilityName = TPT.Default.SpellName[AbilityInfo[1]]
 			local AbilityStatus = AbilityInfo[3]
-			local AnchorSpec = Anchor.Spec
 
-			if ( AbilityStatus ~= false and (AnchorSpec and AnchorSpec[AbilityName] or not TPT.Default.Spec[AbilityName]) ) then
+			if ( AbilityStatus ~= false and (Spec and Spec[AbilityName] or not TPT.Default.Spec[AbilityName]) ) then
 				_, Num = IconSet(Anchor, Num, AbilityInfo, Time)
 			end
 		end
@@ -442,7 +444,7 @@ end
 
 local function InvalidSpecQuery()
 	if InCombatLockdown() or 
-	INSPECT_CURRENT or
+	QUERY_SPEC_CURRENT or
 	UnitIsDead("player") or
 	(InspectFrame and InspectFrame:IsShown())
 	then return 1 end
@@ -451,7 +453,7 @@ end
 function TPT:QuerySpecStop()
 	if ( QUERY_SPEC_TICK and not QUERY_SPEC_TICK:IsCancelled() ) then
 		QUERY_SPEC_TICK_TIMEOUT = nil
-		INSPECT_CURRENT = nil
+		QUERY_SPEC_CURRENT = nil
 		QUERY_SPEC_TICK:Cancel()
 	end
 end
@@ -465,13 +467,13 @@ local function QuerySpecInfo()
 
 	if ( InvalidSpecQuery() ) then return end
 
-	if ( not INSPECT_FRAME ) then
-		INSPECT_FRAME = CreateFrame("Frame")
-		INSPECT_FRAME:SetScript("OnEvent", function (Self, Event, ...)
-			local Anchor = (INSPECT_CURRENT) and TPT.Anchors[INSPECT_CURRENT]
+	if ( not QUERY_SPEC_FRAME ) then
+		QUERY_SPEC_FRAME = CreateFrame("Frame")
+		QUERY_SPEC_FRAME:SetScript("OnEvent", function (Self, Event, ...)
+			local Anchor = (QUERY_SPEC_CURRENT) and TPT.Anchors[QUERY_SPEC_CURRENT]
 
 			if ( InCombatLockdown() or (InspectFrame and InspectFrame:IsShown()) or not Anchor or not Anchor.Class or not Anchor.Active ) then
-				INSPECT_CURRENT = nil
+				QUERY_SPEC_CURRENT = nil
 				return
 			end
 
@@ -505,18 +507,18 @@ local function QuerySpecInfo()
 			if ( not Found ) then
 				Anchor.Spec = nil
 			else
-				TPT:AnchorUpdate(INSPECT_CURRENT) -- Update icons.
+				TPT:AnchorUpdate(QUERY_SPEC_CURRENT) -- Update icons.
 			end
 
-			if ( INSPECT_CURRENT == TPT.PARTY_NUM ) then
+			if ( QUERY_SPEC_CURRENT == TPT.PARTY_NUM ) then
 				TPT:QuerySpecStop()
 			end
 
 			ClearInspectPlayer()
-			INSPECT_CURRENT = nil
+			QUERY_SPEC_CURRENT = nil
 			QUERY_SPEC_TICK_TIMEOUT = nil
 		end)
-		INSPECT_FRAME:RegisterEvent("INSPECT_READY")
+		QUERY_SPEC_FRAME:RegisterEvent("INSPECT_READY")
 	end
 
 	if ( TPT.PARTY_NUM > 0 ) then
@@ -530,7 +532,7 @@ local function QuerySpecInfo()
 				if ( UnitIsConnected(Unit) ) then
 					if ( CheckInteractDistance(Unit, 1) ) then
 						if ( CanInspect(Unit) ) then
-							INSPECT_CURRENT = i
+							QUERY_SPEC_CURRENT = i
 							NotifyInspect(Unit)
 							break
 						end
@@ -557,9 +559,7 @@ end
 ]]
 
 local function ValidZoneType()
-	if ( (TPT.DB.Arena and CURRENT_ZONE_TYPE == "arena") or (((TPT.DB.Dungeon and (CURRENT_ZONE_TYPE == "party" or CURRENT_ZONE_TYPE == "raid")) or (TPT.DB.World and CURRENT_ZONE_TYPE == "none")) and GetNumGroupMembers() < 5) ) then
-		return 1
-	end
+	return ( (TPT.DB.Arena and CURRENT_ZONE_TYPE == "arena") or (((TPT.DB.Dungeon and CURRENT_ZONE_TYPE == "party") or (TPT.DB.World and CURRENT_ZONE_TYPE == "none")) and GetNumGroupMembers() < 5) )
 end
 
 --[[
@@ -612,7 +612,7 @@ end
 
 local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 	if ( Timed ~= false ) then
-		if ( CRF and InCombatLockdown() ) then
+		if ( UNIT_FRAME == "CompactRaidFrame" and InCombatLockdown() ) then
 			TPT:RegisterEvent("PLAYER_REGEN_ENABLED")
 		end
 	end
@@ -624,7 +624,7 @@ local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 			local UnitGUID = UnitGUID(Anchor.Unit)
 			local UnitChange = Anchor.GUID and Anchor.GUID ~= UnitGUID
 
-			if ( UnitChange or (not Anchor.Spec and not INSPECT_CURRENT) ) then
+			if ( UnitChange or (not Anchor.Spec and not QUERY_SPEC_CURRENT) ) then
 				if ( UnitChange ) then
 					Anchor = AnchorShuffle(Anchor, UnitGUID)
 				end
@@ -633,7 +633,7 @@ local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 				TPT:AnchorUpdate(i)
 				TPT:AnchorUpdatePosition(i)
 
-				INSPECT_CURRENT = nil
+				QUERY_SPEC_CURRENT = nil
 				QUERY_SPEC_TICK_TIMEOUT = nil
 				TPT:QuerySpecStart()
 			else
@@ -714,6 +714,25 @@ function TPT:GROUP_ROSTER_UPDATE(UpdateType)
 	end
 end
 
+local function UnitFrame()
+	if ( IsAddOnLoaded("CompactRaidFrame") ) then
+		UNIT_FRAME = "CompactRaidFrame"
+		hooksecurefunc("CompactRaidFrameManagerDisplayFrameProfileSelector_OnClick", GROUP_ROSTER_UPDATE_DELAY)
+	elseif ( IsAddOnLoaded("ElvUI") ) then
+		UNIT_FRAME = "ElvUF_PartyGroup1UnitButton"
+	elseif ( IsAddOnLoaded("ShadowedUnitFrames") ) then
+		UNIT_FRAME = "SUFHeaderpartyUnitButton"
+	elseif ( IsAddOnLoaded("XPerl") ) then
+		UNIT_FRAME = "XPerl_party"
+	elseif ( IsAddOnLoaded("PitBull4") ) then
+		UNIT_FRAME = "PitBull4_Groups_PartyUnitButton"
+	elseif ( IsAddOnLoaded("Grid2") ) then
+		UNIT_FRAME = "Grid2LayoutHeader1UnitButton"
+	else
+		UNIT_FRAME = "PartyMemberFrame"
+	end
+end
+
 local function OnLoad()
 	TPT.Options()
 
@@ -726,15 +745,11 @@ local function OnLoad()
 	TRINKET_ALLIANCE = GetItemIcon(18854)
 	TRINKET_HORDE = GetItemIcon(18849)
 
+	UnitFrame()
+
 	TPT.Anchors:Lock()
 	TPT.Icons:SetScale(TPT.DB.Scale or 1)
 	TPT.Icons:Hide()
-	TPT.Anchors:Hide()
-
-	CRF = CompactRaidFrameContainer or CompactRaidFrameDB
-	if ( CRF ) then
-		hooksecurefunc("CompactRaidFrameManagerDisplayFrameProfileSelector_OnClick", GROUP_ROSTER_UPDATE_DELAY)
-	end
 
 	TPT:RegisterEvent("GROUP_ROSTER_UPDATE")
 	TPT:RegisterEvent("PARTY_CONVERTED_TO_RAID")

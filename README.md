@@ -49,8 +49,6 @@
 
 - **What is the motivation for this?** Most of the Party Ability Bar (PAB) addons for 3.3.5a were pretty basic. I wanted something a little more advanced while keeping it lightweight.
 
-- **Attach option doesn't work with X addon!** Currently only default party frames and Compact Raid Frames are supported for the "Attach" option. Support for others will be added eventually.
-
 - **I found a bug!** Please 📋 [report the issue](https://gitlab.com/Tsoukie/tsoukiepartytracker/-/issues) with as much detail as possible.
 
 <!-- blank line -->
