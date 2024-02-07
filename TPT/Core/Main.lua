@@ -526,9 +526,9 @@ local function QuerySpecInfo()
 			local Anchor = TPT.Anchors[i]
 			if not Anchor then return end
 
-			local Unit = Anchor.Unit
-
 			if ( not Anchor.Spec ) then
+				local Unit = Anchor.Unit
+
 				if ( UnitIsConnected(Unit) ) then
 					if ( CheckInteractDistance(Unit, 1) ) then
 						if ( CanInspect(Unit) ) then
@@ -611,10 +611,8 @@ local function AnchorShuffle(Anchor, GUID)
 end
 
 local function GROUP_ROSTER_UPDATE_DELAY(Timed)
-	if ( Timed ~= false ) then
-		if ( UNIT_FRAME == "CompactRaidFrame" and InCombatLockdown() ) then
-			TPT:RegisterEvent("PLAYER_REGEN_ENABLED")
-		end
+	if ( Timed ~= false and UNIT_FRAME == "CompactRaidFrame" and TPT.DB.Attach and InCombatLockdown() ) then
+		TPT:RegisterEvent("PLAYER_REGEN_ENABLED")
 	end
 
 	for i=1,4 do
@@ -622,7 +620,7 @@ local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 
 		if ( i <= TPT.PARTY_NUM ) then
 			local UnitGUID = UnitGUID(Anchor.Unit)
-			local UnitChange = Anchor.GUID and Anchor.GUID ~= UnitGUID
+			local UnitChange = Anchor.GUID ~= UnitGUID
 
 			if ( UnitChange or (not Anchor.Spec and not QUERY_SPEC_CURRENT) ) then
 				if ( UnitChange ) then
