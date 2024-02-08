@@ -524,7 +524,7 @@ local function QuerySpecInfo()
 	if ( TPT.PARTY_NUM > 0 ) then
 		for i=1, TPT.PARTY_NUM do
 			local Anchor = TPT.Anchors[i]
-			if not Anchor then return end
+			if ( not Anchor ) then return end
 
 			if ( not Anchor.Spec ) then
 				local Unit = Anchor.Unit
