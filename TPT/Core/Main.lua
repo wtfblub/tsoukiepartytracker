@@ -17,7 +17,6 @@ local GetSpellTexture = C_GetSpellTexture or GetSpellTexture
 local CURRENT_ZONE_TYPE
 local PREVIOUS_ZONE_TYPE
 
-local QUERY_SPEC_FRAME
 local QUERY_SPEC_CURRENT
 local QUERY_SPEC_TICK
 local QUERY_SPEC_TICK_TIMEOUT
@@ -450,106 +449,99 @@ local function InvalidSpecQuery()
 	then return 1 end
 end
 
-function TPT:QuerySpecStop()
-	if ( QUERY_SPEC_TICK and not QUERY_SPEC_TICK:IsCancelled() ) then
-		QUERY_SPEC_TICK_TIMEOUT = nil
-		QUERY_SPEC_CURRENT = nil
-		QUERY_SPEC_TICK:Cancel()
-	end
-end
-
-local function QuerySpecInfo()
-	if ( QUERY_SPEC_TICK_TIMEOUT and (QUERY_SPEC_TICK_TIMEOUT >= 5)  ) then -- 4*5 = 20
+local function QuerySpec()
+	if ( QUERY_SPEC_TICK_TIMEOUT and QUERY_SPEC_TICK_TIMEOUT >= 12 ) then -- 1*12 = 12
 		TPT:QuerySpecStop()
 	else
 		QUERY_SPEC_TICK_TIMEOUT = (QUERY_SPEC_TICK_TIMEOUT or 0) + 1
 	end
 
-	if ( InvalidSpecQuery() ) then return end
+	if ( not InvalidSpecQuery() ) then
+		if ( TPT.PARTY_NUM > 0 ) then
+			for i=1, TPT.PARTY_NUM do
+				local Anchor = TPT.Anchors[i]
+				if ( not Anchor ) then return end
 
-	if ( not QUERY_SPEC_FRAME ) then
-		QUERY_SPEC_FRAME = CreateFrame("Frame")
-		QUERY_SPEC_FRAME:SetScript("OnEvent", function (Self, Event, ...)
-			local Anchor = (QUERY_SPEC_CURRENT) and TPT.Anchors[QUERY_SPEC_CURRENT]
+				if ( not Anchor.Spec ) then
+					local Unit = Anchor.Unit
 
-			if ( InCombatLockdown() or (InspectFrame and InspectFrame:IsShown()) or not Anchor or not Anchor.Class or not Anchor.Active ) then
-				QUERY_SPEC_CURRENT = nil
-				return
-			end
-
-			Anchor.Spec = {}
-			local Found
-			local TalentGroup = GetActiveTalentGroup(true)
-
-			for Tab = 1, 3 do
-				for Talent = 1, 31 do
-					local Name, _, _, _, Spent = GetTalentInfo(Tab, Talent, true, false, TalentGroup)
-
-					if ( Name ) then
-						local Spent = Spent > 0
-
-						if ( Spent ) then
-							-- Feral Charge
-							if ( Name == FERAL_CHARGE ) then
-								Anchor.Spec[FERAL_CHARGE_CAT] = 1
-								Name = FERAL_CHARGE_BEAR
-							end
-
-							if ( TPT.Default.Spec[Name] ) then
-								Found = true
-								Anchor.Spec[Name] = Spent
-							end
-						end
+					if ( Unit and UnitIsConnected(Unit) and CheckInteractDistance(Unit, 1) and CanInspect(Unit) ) then
+						QUERY_SPEC_CURRENT = i
+						NotifyInspect(Unit)
+						break
 					end
 				end
 			end
-
-			if ( not Found ) then
-				Anchor.Spec = nil
-			else
-				TPT:AnchorUpdate(QUERY_SPEC_CURRENT) -- Update icons.
-			end
-
-			if ( QUERY_SPEC_CURRENT == TPT.PARTY_NUM ) then
-				TPT:QuerySpecStop()
-			end
-
-			ClearInspectPlayer()
-			QUERY_SPEC_CURRENT = nil
-			QUERY_SPEC_TICK_TIMEOUT = nil
-		end)
-		QUERY_SPEC_FRAME:RegisterEvent("INSPECT_READY")
-	end
-
-	if ( TPT.PARTY_NUM > 0 ) then
-		for i=1, TPT.PARTY_NUM do
-			local Anchor = TPT.Anchors[i]
-			if ( not Anchor ) then return end
-
-			if ( not Anchor.Spec ) then
-				local Unit = Anchor.Unit
-
-				if ( UnitIsConnected(Unit) ) then
-					if ( CheckInteractDistance(Unit, 1) ) then
-						if ( CanInspect(Unit) ) then
-							QUERY_SPEC_CURRENT = i
-							NotifyInspect(Unit)
-							break
-						end
-					end
-				end
-			end
+		else
+			TPT:QuerySpecStop()
 		end
-	else
-		TPT:QuerySpecStop()
 	end
 end
 
 function TPT:QuerySpecStart()
 	if ( (QUERY_SPEC_TICK and QUERY_SPEC_TICK:IsCancelled()) or not QUERY_SPEC_TICK ) then
-		QUERY_SPEC_TICK = Timer(4, QuerySpecInfo)
-		QuerySpecInfo()
+		QUERY_SPEC_TICK = Timer(1, QuerySpec)
+		QuerySpec()
 	end
+end
+
+function TPT:QuerySpecStop()
+	if ( QUERY_SPEC_TICK and not QUERY_SPEC_TICK:IsCancelled() ) then
+		QUERY_SPEC_TICK_TIMEOUT = nil
+		QUERY_SPEC_CURRENT = nil
+		QUERY_SPEC_TICK:Cancel()
+		ClearInspectPlayer()
+	end
+end
+
+function TPT:INSPECT_READY()
+	local Anchor = (QUERY_SPEC_CURRENT) and TPT.Anchors[QUERY_SPEC_CURRENT]
+
+	if ( InCombatLockdown() or (InspectFrame and InspectFrame:IsShown()) or not Anchor or not Anchor.Class or not Anchor.Active ) then
+		QUERY_SPEC_CURRENT = nil
+		return
+	end
+
+	Anchor.Spec = {}
+	local Found
+	local TalentGroup = GetActiveTalentGroup(true)
+
+	for Tab = 1, 3 do
+		for Talent = 1, 31 do
+			local Name, _, _, _, Spent = GetTalentInfo(Tab, Talent, true, false, TalentGroup)
+
+			if ( Name ) then
+				local Spent = Spent > 0
+
+				if ( Spent ) then
+					-- Feral Charge
+					if ( Name == FERAL_CHARGE ) then
+						Anchor.Spec[FERAL_CHARGE_CAT] = 1
+						Name = FERAL_CHARGE_BEAR
+					end
+
+					if ( TPT.Default.Spec[Name] ) then
+						Found = true
+						Anchor.Spec[Name] = Spent
+					end
+				end
+			end
+		end
+	end
+
+	if ( Found ) then
+		TPT:AnchorUpdate(QUERY_SPEC_CURRENT) -- Update icons.
+	else
+		Anchor.Spec = nil
+	end
+
+	if ( QUERY_SPEC_CURRENT == TPT.PARTY_NUM ) then
+		TPT:QuerySpecStop()
+	end
+
+	ClearInspectPlayer()
+	QUERY_SPEC_CURRENT = nil
+	QUERY_SPEC_TICK_TIMEOUT = nil
 end
 
 --[[
@@ -602,12 +594,10 @@ local function AnchorShuffle(Anchor, GUID)
 		end
 	end
 
-	-- No Shuffle
+	-- No shuffle, stop icons.
 	if ( CURRENT_ZONE_TYPE ~= "arena" ) then
 		StopAllIcons(Index)
 	end
-
-	return Anchor
 end
 
 local function GROUP_ROSTER_UPDATE_DELAY(Timed)
@@ -622,27 +612,25 @@ local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 			local UnitGUID = UnitGUID(Anchor.Unit)
 			local UnitChange = Anchor.GUID ~= UnitGUID
 
-			if ( UnitChange or (not Anchor.Spec and not QUERY_SPEC_CURRENT) ) then
-				if ( UnitChange ) then
-					Anchor = AnchorShuffle(Anchor, UnitGUID)
+			if ( UnitChange or not Anchor.Spec or PREVIOUS_ZONE_TYPE ~= CURRENT_ZONE_TYPE ) then
+				local Shuffle = (UnitChange) and AnchorShuffle(Anchor, UnitGUID)
+				if ( Shuffle ) then
+					Anchor = Shuffle
+					UnitChange = nil
 				end
 
 				Anchor.Spec = nil
-				TPT:AnchorUpdate(i)
-				TPT:AnchorUpdatePosition(i)
+
+				if ( UnitChange ) then
+					TPT:AnchorUpdate(i)
+				end
 
 				QUERY_SPEC_CURRENT = nil
 				QUERY_SPEC_TICK_TIMEOUT = nil
 				TPT:QuerySpecStart()
-			else
-				if ( not Anchor.Active ) then
-					TPT:IconUpdate(i)
-				end
-
-				if ( TPT.DB.Attach ) then
-					TPT:AnchorUpdatePosition(i)
-				end
 			end
+
+			TPT:AnchorUpdatePosition(i)
 
 			Anchor.Active = 1
 			Anchor:Show()
@@ -654,6 +642,7 @@ local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 	end
 
 	GROUP_ROSTER_UPDATE_DELAY_QUEUED = nil
+	PREVIOUS_ZONE_TYPE = CURRENT_ZONE_TYPE
 end
 
 function TPT:EnableCheck()
@@ -697,17 +686,13 @@ function TPT:GROUP_ROSTER_UPDATE(UpdateType)
 			TPT:EnableCheck()
 		end
 
-		if ( ValidZoneType() ) then
-			if ( not GROUP_ROSTER_UPDATE_DELAY_QUEUED ) then
-				if ( TPT.PARTY_NUM < PartyPrevious ) then
-					GROUP_ROSTER_UPDATE_DELAY(false)
-				else
-					TimerAfter(.6, GROUP_ROSTER_UPDATE_DELAY)
-					GROUP_ROSTER_UPDATE_DELAY_QUEUED = 1
-				end
+		if ( not GROUP_ROSTER_UPDATE_DELAY_QUEUED and ValidZoneType() ) then
+			if ( TPT.PARTY_NUM < PartyPrevious ) then
+				GROUP_ROSTER_UPDATE_DELAY(false)
+			else
+				TimerAfter(.6, GROUP_ROSTER_UPDATE_DELAY)
+				GROUP_ROSTER_UPDATE_DELAY_QUEUED = 1
 			end
-
-			PREVIOUS_ZONE_TYPE = CURRENT_ZONE_TYPE
 		end
 	end
 end
@@ -751,6 +736,7 @@ local function OnLoad()
 
 	TPT:RegisterEvent("GROUP_ROSTER_UPDATE")
 	TPT:RegisterEvent("PARTY_CONVERTED_TO_RAID")
+	TPT:RegisterEvent("INSPECT_READY")
 end
 
 function TPT:PLAYER_ENTERING_WORLD()
@@ -836,7 +822,7 @@ function TPT:COMBAT_LOG_EVENT_UNFILTERED(...)
 			local Anchor = TPT.Anchors[SourceID]
 
 			-- Classic: Buff BEFORE cast
-			if ( Anchor ) then
+			if ( Anchor and Anchor.Active ) then
 				if ( CastEvent ) then
 					TriggerCooldown(SpellName, Anchor)
 				elseif ( SpellType == "BUFF" and DestGUID == SourceGUID and TPT.DB.Glow ) then
