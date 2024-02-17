@@ -623,6 +623,8 @@ local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 
 				if ( UnitChange ) then
 					TPT:AnchorUpdate(i)
+				elseif ( not Anchor.Active ) then
+					TPT:IconUpdate(i)
 				end
 
 				QUERY_SPEC_CURRENT = nil
