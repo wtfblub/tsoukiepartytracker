@@ -1,7 +1,7 @@
 # Tsoukie Party Tracker for WotLK (3.3.5a - Private Server)
 **`Extremely lightweight & powerful Party Ability Bar/OmniCD for WotLK 3.3.5a private servers.`**
 
-<img src="https://i.imgur.com/TtdeZBh.png" width="50%">
+<img src="https://i.imgur.com/BDhhyiF.jpeg" width="100%">
 
 ---
 
