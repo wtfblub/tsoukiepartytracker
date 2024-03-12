@@ -612,7 +612,7 @@ local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 			local UnitGUID = UnitGUID(Anchor.Unit)
 			local UnitChange = Anchor.GUID ~= UnitGUID
 
-			if ( UnitChange or not Anchor.Spec or PREVIOUS_ZONE_TYPE ~= CURRENT_ZONE_TYPE ) then
+			if ( UnitChange or not Anchor.Spec or not Anchor.Active or PREVIOUS_ZONE_TYPE ~= CURRENT_ZONE_TYPE ) then
 				local Shuffle = (UnitChange) and AnchorShuffle(Anchor, UnitGUID)
 				if ( Shuffle ) then
 					Anchor = Shuffle
