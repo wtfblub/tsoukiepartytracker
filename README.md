@@ -8,33 +8,32 @@
 ### 📥 [Installation](#-installation-1)
 ### 📋 [Report Issue](https://gitlab.com/Tsoukie/tsoukiepartytracker/-/issues)
 ### 💬 [FAQ](#-faq-1)
-### ❤️ [Credits](#%EF%B8%8F-credits-1)
+### ❤️ [Support & Credit](#%EF%B8%8F-support-credit-1)
 
 ---
 ### Features:
-- **Spec Detection** • _Dynamic icons for units with different specs_
-- **Racials** • _All races supported_
-- **Linked Spells** • _Known spells that share a cooldown can be triggered by other shared spells_
-- **Icon Position** • _Change the position of each class spell_
-- **Animations** • _When an ability is used or active display visual cues - can be disabled_
-- **Compact Raid Frame** • _Attach to frame supported_
-- **Option Panel** • _Easily add, remove and disable spells, also change visual options such as alignment and size_
-- **Much more!** • _Many more features such as Grow Left, Rows, Tooltips etc_
+- **Spec Detection:** _Dynamic icons for units with different specs_
+- **Racials:** _All races supported_
+- **Linked Spells:** _Known spells that share a cooldown can be triggered by other shared spells_
+- **Icon Position:** _Change the position of each class spell_
+- **Animations:** _When an ability is used or active display visual cues - can be disabled_
+- **Compact Raid Frame:** _Attach to frame supported_
+- **Option Panel:** _Easily add, remove and disable spells, also change visual options such as alignment and size_
+- **Much more:** _Many more features such as Grow Left, Rows, Tooltips etc!_
 
 ### Commands:
-- **`/tpt`** - _Display option panel_
-- **`/pab`** - _Display option panel_
+- **`/tpt`** _Display option panel_
+- **`/pab`** _Display option panel_
 
 <!-- blank line -->
 <br>
 <!-- blank line -->
 
----
 # 📥 Installation
 
 1. Download Latest Release `[.zip, .gz, ...]`:
-    - [`📥 TPT`](https://gitlab.com/Tsoukie/tsoukiepartytracker/-/releases)
-    - [`📥 ClassicAPI`](https://gitlab.com/Tsoukie/classicapi/-/releases)
+    - <a href="https://gitlab.com/Tsoukie/tsoukiepartytracker/-/releases/permalink/latest" target="_blank">`📥 TPT`</a>
+	- <a href="https://gitlab.com/Tsoukie/classicapi/-/releases/permalink/latest" target="_blank">`📥 ClassicAPI`</a> **⚠Required**
 2. Extract the downloaded compressed files _(eg. Right-Click -> Extract-All)_.
 3. Navigate within each extracted folder(s) looking for the following: `TPT` or `!!!ClassicAPI`.
 4. Move folder(s) named `TPT` or `!!!ClassicAPI` to your `Interface\AddOns\` folder.
@@ -44,18 +43,24 @@
 <br>
 <!-- blank line -->
 
----
+
 # 💬 FAQ
 
-- **What is the motivation for this?** Most of the Party Ability Bar (PAB) addons for 3.3.5a were pretty basic. I wanted something a little more advanced while keeping it lightweight.
+> I found a bug!
 
-- **I found a bug!** Please 📋 [report the issue](https://gitlab.com/Tsoukie/tsoukiepartytracker/-/issues) with as much detail as possible.
+Please 📋 [report the issue](https://gitlab.com/Tsoukie/tsoukiepartytracker/-/issues) with as much detail as possible.
 
 <!-- blank line -->
 <br>
 <!-- blank line -->
 
----
-# ❤️ Credits
 
+# ❤️ Support & Credit
+ 
+If you wish to show some support you can do so [here](https://streamlabs.com/tsoukielol/tip). Tips are completely voluntary and aren't required to download my projects, however, they are _very_ much appreciated. They allow me to devote more time to creating things I truly enjoy. 💜
+
+<!-- blank line -->
+<br>
+<!-- blank line -->
+  
 _This_ addon has been created and maintained by [Tsoukie](https://gitlab.com/Tsoukie/) and is **not** related or affiliated with any other version.
