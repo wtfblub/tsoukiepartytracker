@@ -59,6 +59,7 @@ TPT.Default.Spells = {
 		{10278, 180}, -- Hand of Protection
 		{64205, 120}, -- Divine Sacrifice
 		{642, 300}, -- Divine Shield
+		{31884, 180}, -- Avenging Wrath
 
 		{66008, 60}, -- Repentance
 
@@ -356,7 +357,27 @@ TPT.Default.Shared = {
 	["WARRIOR"] = {
 		[72] = 1, -- Shield Bash
 		[6552] = 1, -- Pummel
+		[871] = 2, -- Shield Wall
+		[20230] = 2, -- Retailiation
+		[1719] = 2, -- Recklessness
 	},
+	["PALADIN"] = {
+		[31884] = 1, -- Avenging Wrath
+		[642] = 1, -- Divine Shield
+		[498] = 1, -- Divine Protection
+		[633] = 1, -- Lay on Hands
+	},
+
+	-- SPECIAL CD(S)
+	["CD"] = {
+		[871] = 12,
+		[20230] = 12,
+		[1719] = 12,
+		[31884] = 30,
+		[642] = 120,
+		[498] = 120,
+		[633] = 120,
+	}
 }
 
 TPT.Default.Reset = {

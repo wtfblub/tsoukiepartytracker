@@ -29,6 +29,7 @@ local HEX
 local FERAL_CHARGE
 local FERAL_CHARGE_CAT
 local FERAL_CHARGE_BEAR
+local AVENGING_WRATH
 
 local RACIAL_UNDEAD
 local TRINKET_ALLIANCE
@@ -96,7 +97,7 @@ local function Start(Anchor, Icon, SetCD)
 	if ( Icon.Name ) then
 		CooldownFrame_Set(Icon.Swipe, GetTime(), SetCD or Icon.CD, 1)
 
-		if ( TPT.DB.Glow ) then
+		if ( TPT.DB.Glow and not SetCD ) then
 			if ( not Icon.Flash ) then
 				Icon.Flash = CreateFrame("Frame", nil, Icon, "TGlowFlash")
 			end
@@ -121,7 +122,6 @@ function TPT:IconUpdate(i)
 	local Anchor = TPT.Anchors[i]
 	local LastIndex = 0
 	local Count = 1
-	local Time = GetTime()
 
 	for Index=1,#Anchor do
 		local Icon = Anchor[Index]
@@ -375,7 +375,6 @@ function TPT:AnchorUpdate(i)
 	if ( Class ) then
 		local _, Race = UnitRace(Unit)
 
-		local Icon
 		local Num = 1
 		local Time = GetTime()
 		local Spec = Anchor.Spec
@@ -385,31 +384,19 @@ function TPT:AnchorUpdate(i)
 		Anchor.Race = Race
 
 		-- PvP Trinket
-		local Trinket = (Race == "Human") and TPT.Default.Trinket[2] or TPT.Default.Trinket[1]
 		if ( TPT.DB.Trinket ) then
+			local Trinket = (Race == "Human") and TPT.Default.Trinket[2] or TPT.Default.Trinket[1]
 			local TrinketIcon = (PLAYER_FACTION == "Alliance") and TRINKET_ALLIANCE or TRINKET_HORDE
 			local TrinketID, TrinketCD, TrinketName = Trinket[1], Trinket[2], Trinket[3]
 			_, Num = IconSet(Anchor, Num, nil, Time, TrinketName, TrinketID, TrinketCD, TrinketIcon)
-		else
-			Icon = Anchor[Num]
-			if ( Icon and Icon.Name == Trinket[3] ) then
-				Stop(Icon)
-				Icon.Name = nil
-			end
 		end
 
 		-- Racial
-		local Racial = TPT.Default.Racial[Race]
-		if ( Racial ) then
-			if ( TPT.DB.Racial ) then
+		if ( TPT.DB.Racial ) then
+			local Racial = TPT.Default.Racial[Race]
+			if ( Racial ) then
 				local RacialID, RacialCD, RacialName = Racial[1], Racial[2], Racial[3]
 				_, Num = IconSet(Anchor, Num, nil, Time, RacialName, RacialID, RacialCD, GetSpellTexture(RacialID))
-			else
-				Icon = Anchor[Num]
-				if ( Icon and Icon.ID == Racial[1] ) then
-					Stop(Icon)
-					Icon.Name = nil
-				end
 			end
 		end
 
@@ -427,8 +414,7 @@ function TPT:AnchorUpdate(i)
 
 		-- Icon Overflow
 		for i=Num,#Anchor do
-			Icon = Anchor[i]
-			Icon.Name = nil
+			Anchor[i].Name = nil
 		end
 
 		TPT:IconUpdate(i)
@@ -700,7 +686,7 @@ function TPT:GROUP_ROSTER_UPDATE(UpdateType)
 end
 
 local function UnitFrame()
-	if ( IsAddOnLoaded("CompactRaidFrame") ) then
+	if ( IsAddOnLoaded("CompactRaidFrame") and CUF_CVar:GetCVarBool("useCompactPartyFrames") ) then
 		UNIT_FRAME = "CompactRaidFrame"
 		hooksecurefunc("CompactRaidFrameManagerDisplayFrameProfileSelector_OnClick", GROUP_ROSTER_UPDATE_DELAY)
 	elseif ( IsAddOnLoaded("ElvUI") ) then
@@ -725,6 +711,7 @@ local function OnLoad()
 	FERAL_CHARGE = GetSpellInfo(49377)
 	FERAL_CHARGE_BEAR = GetSpellInfo(16979)
 	FERAL_CHARGE_CAT = GetSpellInfo(49376)
+	AVENGING_WRATH = GetSpellInfo(31884)
 
 	RACIAL_UNDEAD = GetSpellInfo(7744)
 	TRINKET_ALLIANCE = GetItemIcon(18854)
@@ -775,7 +762,7 @@ local function TriggerCooldown(SpellName, Anchor)
 
 		if ( Icon.Name == SpellName ) then
 			Start(Anchor, Icon)
-		else
+		elseif ( Icon.Name ) then
 			-- Undead Racial <-> PvP Trinket (45s)
 			if ( Anchor.Race == "Scourge" ) then
 				local Trinket = TPT.Default.Trinket[1][3]
@@ -786,24 +773,19 @@ local function TriggerCooldown(SpellName, Anchor)
 				end
 			end
 
-			-- Grouped CD
-			local GroupedClassSpells = TPT.Default.Shared[Anchor.Class]
-			if ( GroupedClassSpells ) then
-				local GroupedSpellType = GroupedClassSpells[SpellName]
-
-				if ( GroupedSpellType ) then
-					if ( GroupedSpellType == GroupedClassSpells[Icon.Name] ) then
-						Start(Anchor, Icon)
-					end
+			-- Shared CD
+			local SharedClassSpells = TPT.Default.Shared[Anchor.Class]
+			if ( SharedClassSpells ) then
+				local SharedSpellType = SharedClassSpells[SpellName]
+				if ( SharedSpellType and SharedSpellType == SharedClassSpells[Icon.Name] and not Icon.Swipe:IsShown() ) then
+					Start(Anchor, Icon, (SpellName == AVENGING_WRATH) and 30 or TPT.Default.Shared.CD[Icon.Name])
 				end
 			end
 
 			-- Reset CD
 			local Reset = TPT.Default.Reset[SpellName]
-			if ( Reset ) then
-				if ( Reset[Icon.Name] ) then
-					Stop(Icon)
-				end
+			if ( Reset and Reset[Icon.Name] ) then
+				Stop(Icon)
 			end
 		end
 	end

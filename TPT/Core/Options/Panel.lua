@@ -463,9 +463,11 @@ function TPT.OptionOnLoad(Self, AddonName)
 
 			local MetaIDTooltip = "Abilities with same number are linked.\n\n|cFFe87117Example: Pummel will trigger Shield Bash.|r"
 			for Class, Data in pairs(TPT.Default.Shared) do
-				MetaIDTooltip = MetaIDTooltip.."\n\n|r"..Class
-				for Ability, Type in pairs(Data) do
-					MetaIDTooltip = MetaIDTooltip.."\n  |cFFffffff"..Type.." - "..Ability
+				if ( Class ~= "CD" ) then
+					MetaIDTooltip = MetaIDTooltip.."\n\n|r"..Class
+					for Ability, Type in pairs(Data) do
+						MetaIDTooltip = MetaIDTooltip.."\n  |cFFffffff"..Type.." - "..Ability
+					end
 				end
 			end
 
