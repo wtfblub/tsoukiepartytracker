@@ -358,7 +358,7 @@ TPT.Default.Shared = {
 		[72] = 1, -- Shield Bash
 		[6552] = 1, -- Pummel
 		[871] = 2, -- Shield Wall
-		[20230] = 2, -- Retailiation
+		[20230] = 2, -- Retaliation
 		[1719] = 2, -- Recklessness
 	},
 	["PALADIN"] = {
