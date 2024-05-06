@@ -49,12 +49,14 @@ function TPT.OptionOnLoad(Self, AddonName)
 						TPT:GROUP_ROSTER_UPDATE(Type)
 					else
 						for i=1, TPT.PARTY_NUM do
-							if ( Type == "Icons" ) then
-								TPT:IconUpdate(i)
-							elseif ( Type == "Position" ) then
-								TPT:AnchorUpdatePosition(i)
-							else
-								TPT:AnchorUpdate(i)
+							if ( TPT.Anchors[i] ) then
+								if ( Type == "Icons" ) then
+									TPT:IconUpdate(i)
+								elseif ( Type == "Position" ) then
+									TPT:AnchorUpdatePosition(i)
+								else
+									TPT:AnchorUpdate(i)
+								end
 							end
 						end
 					end
