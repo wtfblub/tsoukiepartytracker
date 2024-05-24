@@ -537,7 +537,7 @@ end
 ]]
 
 local function ValidZoneType()
-	return ( (TPT.DB.Arena and CURRENT_ZONE_TYPE == "arena") or (((TPT.DB.Dungeon and CURRENT_ZONE_TYPE == "party") or (TPT.DB.World and CURRENT_ZONE_TYPE == "none")) and GetNumGroupMembers() < 5) )
+	return ( (TPT.DB.Arena and CURRENT_ZONE_TYPE == "arena") or (((TPT.DB.Dungeon and CURRENT_ZONE_TYPE == "party") or (TPT.DB.World and CURRENT_ZONE_TYPE == "none")) and GetNumGroupMembers() < 6) )
 end
 
 --[[
