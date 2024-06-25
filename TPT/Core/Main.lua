@@ -1,18 +1,21 @@
 local AddOn, TPT, Private = select(2, ...):Init()
 
 local _G = _G
+
 local GetTime = GetTime
 local UIParent = UIParent
 local UnitGUID = UnitGUID
 local UnitRace = UnitRace
+local IsInRaid = IsInRaid
 local UnitClass = UnitClass
 local Timer = C_Timer.NewTicker
 local TimerAfter = C_Timer.After
 local GetSpellInfo = GetSpellInfo
 local IsInInstance = IsInInstance
 local CooldownFrame_Set = CooldownFrame_Set
+local GetNumGroupMembers = GetNumGroupMembers
 local GetNumSubgroupMembers = GetNumSubgroupMembers
-local GetSpellTexture = C_GetSpellTexture or GetSpellTexture
+local GetSpellTexture = C_GetSpellTexture
 
 local CURRENT_ZONE_TYPE
 local PREVIOUS_ZONE_TYPE
