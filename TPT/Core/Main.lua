@@ -48,7 +48,7 @@ TPT.Anchors = CreateFrame("Frame", nil, UIParent)
 ]]
 
 local function AnimateTexCoords_OnUpdate(Self, Elapsed)
-	AnimateTexCoords(Self.A, 256, 256, 48, 48, 22, Elapsed, 0.03)
+	AnimateTexCoords(Self.A, 256, 256, 48, 48, 22, Elapsed, .02)
 end
 
 local function GlowHide(Icon)
@@ -57,6 +57,10 @@ local function GlowHide(Icon)
 		Icon.Glow:Hide()
 		Icon.Glow:SetScript("OnUpdate", nil)
 		Icon.Glow.SetScript = nil
+
+		if ( TPT.DB.Fade ) then
+			Icon.Texture:SetDesaturated(1)
+		end
 	end
 end
 
@@ -73,6 +77,10 @@ local function Glow(SpellName, Event, Anchor)
 				Icon.Swipe:SetAlpha(0)
 				Icon.Glow:SetScript("OnUpdate", AnimateTexCoords_OnUpdate)
 				Icon.Glow:Show()
+
+				if ( TPT.DB.Fade ) then
+					Icon.Texture:SetDesaturated(nil)
+				end
 			else
 				GlowHide(Icon)
 
@@ -110,6 +118,9 @@ local function Start(Anchor, Icon, SetCD)
 		if ( TPT.DB.Hidden ) then
 			TPT:IconUpdate(Anchor.i)
 		else
+			if ( TPT.DB.Fade ) then
+				Icon.Texture:SetDesaturated(1)
+			end
 			Icon:Show()
 		end
 	end
@@ -174,20 +185,31 @@ local function CooldownOnHide(Self)
 	local Icon = Self:GetParent()
 	GlowHide(Icon)
 
-	if ( TPT.DB.Hidden and Icon.Anchor.Active ) then
-		TPT:IconUpdate(Icon.Anchor.i)
+	if ( TPT.DB.Hidden ) then
+		if ( Icon.Anchor.Active ) then
+			TPT:IconUpdate(Icon.Anchor.i)
+		end
+	elseif ( TPT.DB.Fade ) then
+		Icon.Texture:SetDesaturated(nil)
 	end
 end
 
 local function IconCreate(Anchor)
-	local Icon = CreateFrame("Frame", nil, TPT.Icons, "ActionButtonTemplate")
+	local Icon = CreateFrame("Button", nil, TPT.Icons)
 	local Swipe = CreateFrame("Cooldown", nil, Icon, "CooldownFrameTemplate")
 	Icon:SetSize(40,40)
 	Icon.Swipe = Swipe
 	Icon.Anchor = Anchor
 
-	local Texture = Icon:CreateTexture(nil,"ARTWORK")
-	Texture:SetAllPoints(true)
+	local Border = Icon:CreateTexture(nil, "BACKGROUND")
+	Border:SetAllPoints(true)
+	Border:SetColorTexture(0, 0, 0, 1)
+	Border = 1.6
+
+	local Texture = Icon:CreateTexture(nil, "ARTWORK")
+	Texture:SetPoint("TOPLEFT", Icon, Border, -Border)
+	Texture:SetPoint("BOTTOMRIGHT", Icon, -Border, Border)
+	Texture:SetTexCoord(.07, .9, .07, .93)
 	Icon.Texture = Texture
 
 	Icon:EnableMouse()
@@ -213,16 +235,11 @@ local function IconSet(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 	end
 
 	Icon.Texture:SetTexture(Texture)
+	Icon.Texture:SetDesaturated(nil)
 	Icon.Name = Name
 	Icon.ID = ID
 	Icon.CD = CD
 	Icon.GUID = Anchor.GUID
-
-	if ( TPT.DB.Border ) then
-		Icon.Texture:SetTexCoord(0, 1, 0, 1)
-	else
-		Icon.Texture:SetTexCoord(0.07, 0.9, 0.07, 0.90)
-	end
 
 	return Icon, (Num + 1)
 end
@@ -592,43 +609,43 @@ end
 local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 	if ( Timed ~= false and UNIT_FRAME == "CompactRaidFrame" and TPT.DB.Attach and InCombatLockdown() ) then
 		TPT:RegisterEvent("PLAYER_REGEN_ENABLED")
-	end
+	else
+		for i=1,4 do
+			local Anchor = TPT.Anchors[i] or AnchorCreate(i)
 
-	for i=1,4 do
-		local Anchor = TPT.Anchors[i] or AnchorCreate(i)
+			if ( i <= TPT.PARTY_NUM ) then
+				local UnitGUID = UnitGUID(Anchor.Unit)
+				local UnitChange = Anchor.GUID ~= UnitGUID
 
-		if ( i <= TPT.PARTY_NUM ) then
-			local UnitGUID = UnitGUID(Anchor.Unit)
-			local UnitChange = Anchor.GUID ~= UnitGUID
+				if ( UnitChange or not Anchor.Spec or not Anchor.Active or PREVIOUS_ZONE_TYPE ~= CURRENT_ZONE_TYPE ) then
+					local Shuffle = (UnitChange) and AnchorShuffle(Anchor, UnitGUID)
+					if ( Shuffle ) then
+						Anchor = Shuffle
+						UnitChange = nil
+					end
 
-			if ( UnitChange or not Anchor.Spec or not Anchor.Active or PREVIOUS_ZONE_TYPE ~= CURRENT_ZONE_TYPE ) then
-				local Shuffle = (UnitChange) and AnchorShuffle(Anchor, UnitGUID)
-				if ( Shuffle ) then
-					Anchor = Shuffle
-					UnitChange = nil
+					Anchor.Spec = nil
+
+					if ( UnitChange ) then
+						TPT:AnchorUpdate(i)
+					elseif ( not Anchor.Active ) then
+						TPT:IconUpdate(i)
+					end
+
+					QUERY_SPEC_CURRENT = nil
+					QUERY_SPEC_TICK_TIMEOUT = nil
+					TPT:QuerySpecStart()
 				end
 
-				Anchor.Spec = nil
+				TPT:AnchorUpdatePosition(i)
 
-				if ( UnitChange ) then
-					TPT:AnchorUpdate(i)
-				elseif ( not Anchor.Active ) then
-					TPT:IconUpdate(i)
-				end
-
-				QUERY_SPEC_CURRENT = nil
-				QUERY_SPEC_TICK_TIMEOUT = nil
-				TPT:QuerySpecStart()
+				Anchor.Active = 1
+				Anchor:Show()
+			elseif ( Anchor.Active ) then
+				Anchor.Active = nil
+				StopAllIcons(i, true)
+				Anchor:Hide()
 			end
-
-			TPT:AnchorUpdatePosition(i)
-
-			Anchor.Active = 1
-			Anchor:Show()
-		elseif ( Anchor.Active ) then
-			Anchor.Active = nil
-			StopAllIcons(i, true)
-			Anchor:Hide()
 		end
 	end
 

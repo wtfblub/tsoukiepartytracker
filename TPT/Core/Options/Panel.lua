@@ -18,6 +18,9 @@ function TPT.Options()
 	end
 	TPT.DB = TPTDB
 
+	-- Deprecated
+	TPT.DB.Border = nil
+
 	TPT:Locale()
 	TPT.OptionPanel(AddonName, TPT.OptionOnLoad, "/tpt", "/pab")
 end
@@ -29,7 +32,7 @@ function TPT.OptionOnLoad(Self, AddonName)
 	Panel.Default = function()end
 
 	local Header, Parent, Attach, Lock,
-	Display, Scale, Hidden, Glow, Border, GrowLeft, Rows, Tooltip,
+	Display, Scale, Hidden, Glow, Fade, GrowLeft, Rows, Tooltip,
 	Position, OffsetX, OffsetY, Padding,
 	Zone, Arena, Dungeon, World,
 	Ability, Trinket, Racial, Scroll, ScrollChild, Class, ClassTab, ClassAdd,
@@ -355,12 +358,13 @@ function TPT.OptionOnLoad(Self, AddonName)
 				"Glow active icons.")
 			Glow:SetPoint("LEFT", Hidden, "RIGHT", 100, 0)
 
-			Border = TPT.CreateCheck(Panel, "Border",
-				function() return TPT.DB.Border end,
-				function(_, Value) Update("All", "Border", Value) end,
-				"Border around icons.",
+			local Border -- Remove, here for search purposes.
+			Fade = TPT.CreateCheck(Panel, "Fade",
+				function() return TPT.DB.Fade end,
+				function(_, Value) Update("All", "Fade", Value) end,
+				"Fade icon on cooldown.",
 				true)
-			Border:SetPoint("LEFT", Glow, "RIGHT", 100, 0)
+			Fade:SetPoint("LEFT", Glow, "RIGHT", 100, 0)
 
 			GrowLeft = TPT.CreateCheck(Panel, "Grow Left",
 				function() return TPT.DB.Left end,
