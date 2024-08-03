@@ -195,7 +195,7 @@ local function CooldownOnHide(Self)
 end
 
 local function IconCreate(Anchor)
-	local Icon = CreateFrame("Button", nil, TPT.Icons)
+	local Icon = CreateFrame("Frame", nil, TPT.Icons)
 	local Swipe = CreateFrame("Cooldown", nil, Icon, "CooldownFrameTemplate")
 	Icon:SetSize(40,40)
 	Icon.Swipe = Swipe
