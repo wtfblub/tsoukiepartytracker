@@ -45,13 +45,15 @@ function TPT.OptionOnLoad(Self, AddonName)
 			]]
 
 			local function Update(Type, ID, Value)
+				local GroupSubSize = GetNumSubgroupMembers()
+
 				if ( ID ) then TPT.DB[ID] = Value end
 
-				if ( TPT.PARTY_NUM > 0 and Type ) then
+				if ( GroupSubSize > 0 and Type ) then
 					if ( Type == "Zone" ) then
 						TPT:GROUP_ROSTER_UPDATE(Type)
 					else
-						for i=1, TPT.PARTY_NUM do
+						for i=1, GroupSubSize do
 							if ( TPT.Anchors[i] ) then
 								if ( Type == "Icons" ) then
 									TPT:IconUpdate(i)

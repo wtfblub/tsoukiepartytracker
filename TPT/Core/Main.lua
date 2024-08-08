@@ -12,31 +12,38 @@ local Timer = C_Timer.NewTicker
 local TimerAfter = C_Timer.After
 local GetSpellInfo = GetSpellInfo
 local IsInInstance = IsInInstance
+local GetSpellTexture = C_GetSpellTexture
 local CooldownFrame_Set = CooldownFrame_Set
 local GetNumGroupMembers = GetNumGroupMembers
 local GetNumSubgroupMembers = GetNumSubgroupMembers
-local GetSpellTexture = C_GetSpellTexture
 
-local CURRENT_ZONE_TYPE
-local PREVIOUS_ZONE_TYPE
+local ADDON_STATE
 
-local QUERY_SPEC_CURRENT
-local QUERY_SPEC_TICK
-local QUERY_SPEC_TICK_TIMEOUT
-local GROUP_ROSTER_UPDATE_DELAY_QUEUED
+local ZONE_TYPE
+local ZONE_TYPE_PREVIOUS
 
-local PLAYER_FACTION
+local GROUP_ID
+local GROUP_TYPE
+local GROUP_SUB_SIZE
+
+local QUERY_TALENT
+local QUERY_TALENT_ID
+local QUERY_TALENT_TIMEOUT
+
+local GROUP_UPDATE_QUEUED
+
 local UNIT_FRAME
+local PLAYER_FACTION
 
 local HEX
 local FERAL_CHARGE
+local AVENGING_WRATH
 local FERAL_CHARGE_CAT
 local FERAL_CHARGE_BEAR
-local AVENGING_WRATH
 
 local RACIAL_UNDEAD
-local TRINKET_ALLIANCE
 local TRINKET_HORDE
+local TRINKET_ALLIANCE
 
 TPT.Icons = CreateFrame("Frame", nil, UIParent)
 TPT.Anchors = CreateFrame("Frame", nil, UIParent)
@@ -268,7 +275,7 @@ end
 ]]
 
 function TPT.Anchors.Lock()
-	if ( TPT.DB.Lock or not TPT.ENABLED ) then TPT.Anchors:Hide() else TPT.Anchors:Show() end
+	if ( TPT.DB.Lock or not ADDON_STATE ) then TPT.Anchors:Hide() else TPT.Anchors:Show() end
 end
 
 local function Attach(Anchor)
@@ -278,7 +285,7 @@ local function Attach(Anchor)
 
 		if ( UNIT_FRAME == "CompactRaidFrame" ) then
 			if ( CompactRaidFrameManager_GetSetting("KeepGroupsTogether") ) then
-				if ( IsInRaid() ) then
+				if ( GROUP_TYPE == "raid" ) then
 					AddOn = "CompactRaidGroup1Member"
 				else
 					AddOn = "CompactPartyFrameMember"
@@ -286,7 +293,7 @@ local function Attach(Anchor)
 			end
 		end
 
-		for i=1, (UNIT_FRAME == "CompactRaidFrame" and 40 or TPT.PARTY_NUM + 1) do
+		for i=1, (UNIT_FRAME == "CompactRaidFrame" and 40 or GROUP_SUB_SIZE + 1) do
 			local Frame = _G[AddOn..i]
 
 			if ( Frame and not Frame:IsForbidden() ) then
@@ -449,22 +456,22 @@ end
 
 local function InvalidSpecQuery()
 	if InCombatLockdown() or 
-	QUERY_SPEC_CURRENT or
+	QUERY_TALENT_ID or
 	UnitIsDead("player") or
 	(InspectFrame and InspectFrame:IsShown())
 	then return 1 end
 end
 
 local function QuerySpec()
-	if ( QUERY_SPEC_TICK_TIMEOUT and QUERY_SPEC_TICK_TIMEOUT >= 12 ) then -- 1*12 = 12
+	if ( QUERY_TALENT_TIMEOUT and QUERY_TALENT_TIMEOUT >= 12 ) then -- 1*12 = 12
 		TPT:QuerySpecStop()
 	else
-		QUERY_SPEC_TICK_TIMEOUT = (QUERY_SPEC_TICK_TIMEOUT or 0) + 1
+		QUERY_TALENT_TIMEOUT = (QUERY_TALENT_TIMEOUT or 0) + 1
 	end
 
 	if ( not InvalidSpecQuery() ) then
-		if ( TPT.PARTY_NUM > 0 ) then
-			for i=1, TPT.PARTY_NUM do
+		if ( GROUP_SUB_SIZE > 0 ) then
+			for i=1, GROUP_SUB_SIZE do
 				local Anchor = TPT.Anchors[i]
 				if ( not Anchor ) then return end
 
@@ -472,7 +479,7 @@ local function QuerySpec()
 					local Unit = Anchor.Unit
 
 					if ( Unit and UnitIsConnected(Unit) and CheckInteractDistance(Unit, 1) and CanInspect(Unit) ) then
-						QUERY_SPEC_CURRENT = i
+						QUERY_TALENT_ID = i
 						NotifyInspect(Unit)
 						break
 					end
@@ -485,26 +492,26 @@ local function QuerySpec()
 end
 
 function TPT:QuerySpecStart()
-	if ( (QUERY_SPEC_TICK and QUERY_SPEC_TICK:IsCancelled()) or not QUERY_SPEC_TICK ) then
-		QUERY_SPEC_TICK = Timer(1, QuerySpec)
+	if ( (QUERY_TALENT and QUERY_TALENT:IsCancelled()) or not QUERY_TALENT ) then
+		QUERY_TALENT = Timer(1, QuerySpec)
 		QuerySpec()
 	end
 end
 
 function TPT:QuerySpecStop()
-	if ( QUERY_SPEC_TICK and not QUERY_SPEC_TICK:IsCancelled() ) then
-		QUERY_SPEC_TICK_TIMEOUT = nil
-		QUERY_SPEC_CURRENT = nil
-		QUERY_SPEC_TICK:Cancel()
+	if ( QUERY_TALENT and not QUERY_TALENT:IsCancelled() ) then
+		QUERY_TALENT_TIMEOUT = nil
+		QUERY_TALENT_ID = nil
+		QUERY_TALENT:Cancel()
 		ClearInspectPlayer()
 	end
 end
 
 function TPT:INSPECT_READY()
-	local Anchor = (QUERY_SPEC_CURRENT) and TPT.Anchors[QUERY_SPEC_CURRENT]
+	local Anchor = (QUERY_TALENT_ID) and TPT.Anchors[QUERY_TALENT_ID]
 
 	if ( InCombatLockdown() or (InspectFrame and InspectFrame:IsShown()) or not Anchor or not Anchor.Class or not Anchor.Active ) then
-		QUERY_SPEC_CURRENT = nil
+		QUERY_TALENT_ID = nil
 		return
 	end
 
@@ -536,28 +543,18 @@ function TPT:INSPECT_READY()
 	end
 
 	if ( Found ) then
-		TPT:AnchorUpdate(QUERY_SPEC_CURRENT) -- Update icons.
+		TPT:AnchorUpdate(QUERY_TALENT_ID) -- Update icons.
 	else
 		Anchor.Spec = nil
 	end
 
-	if ( QUERY_SPEC_CURRENT == TPT.PARTY_NUM ) then
+	if ( QUERY_TALENT_ID == GROUP_SUB_SIZE ) then
 		TPT:QuerySpecStop()
 	end
 
 	ClearInspectPlayer()
-	QUERY_SPEC_CURRENT = nil
-	QUERY_SPEC_TICK_TIMEOUT = nil
-end
-
---[[
-
-	ZONE
-
-]]
-
-local function ValidZoneType()
-	return ( (TPT.DB.Arena and CURRENT_ZONE_TYPE == "arena") or (((TPT.DB.Dungeon and CURRENT_ZONE_TYPE == "party") or (TPT.DB.World and CURRENT_ZONE_TYPE == "none")) and GetNumGroupMembers() < 6) )
+	QUERY_TALENT_ID = nil
+	QUERY_TALENT_TIMEOUT = nil
 end
 
 --[[
@@ -601,23 +598,23 @@ local function AnchorShuffle(Anchor, GUID)
 	end
 
 	-- No shuffle, stop icons.
-	if ( CURRENT_ZONE_TYPE ~= "arena" ) then
+	if ( ZONE_TYPE ~= "arena" ) then
 		StopAllIcons(Index)
 	end
 end
 
-local function GROUP_ROSTER_UPDATE_DELAY(Timed)
-	if ( Timed ~= false and UNIT_FRAME == "CompactRaidFrame" and TPT.DB.Attach and InCombatLockdown() ) then
+local function GroupUpdate(Delayed)
+	if ( Delayed ~= false and UNIT_FRAME == "CompactRaidFrame" and TPT.DB.Attach and InCombatLockdown() ) then
 		TPT:RegisterEvent("PLAYER_REGEN_ENABLED")
 	else
 		for i=1,4 do
 			local Anchor = TPT.Anchors[i] or AnchorCreate(i)
 
-			if ( i <= TPT.PARTY_NUM ) then
+			if ( i <= GROUP_SUB_SIZE ) then
 				local UnitGUID = UnitGUID(Anchor.Unit)
 				local UnitChange = Anchor.GUID ~= UnitGUID
 
-				if ( UnitChange or not Anchor.Spec or not Anchor.Active or PREVIOUS_ZONE_TYPE ~= CURRENT_ZONE_TYPE ) then
+				if ( UnitChange or not Anchor.Spec or not Anchor.Active or ZONE_TYPE_PREVIOUS ~= ZONE_TYPE ) then
 					local Shuffle = (UnitChange) and AnchorShuffle(Anchor, UnitGUID)
 					if ( Shuffle ) then
 						Anchor = Shuffle
@@ -632,8 +629,8 @@ local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 						TPT:IconUpdate(i)
 					end
 
-					QUERY_SPEC_CURRENT = nil
-					QUERY_SPEC_TICK_TIMEOUT = nil
+					QUERY_TALENT_ID = nil
+					QUERY_TALENT_TIMEOUT = nil
 					TPT:QuerySpecStart()
 				end
 
@@ -649,14 +646,14 @@ local function GROUP_ROSTER_UPDATE_DELAY(Timed)
 		end
 	end
 
-	GROUP_ROSTER_UPDATE_DELAY_QUEUED = nil
-	PREVIOUS_ZONE_TYPE = CURRENT_ZONE_TYPE
+	GROUP_UPDATE_QUEUED = nil
+	ZONE_TYPE_PREVIOUS = ZONE_TYPE
 end
 
-function TPT:EnableCheck()
-	if ( ValidZoneType() and TPT.PARTY_NUM > 0 ) then
-		if ( not TPT.ENABLED ) then
-			TPT.ENABLED = 1
+local function AddonEnabled()
+	if ( GROUP_SUB_SIZE > 0 and ((TPT.DB.Arena and ZONE_TYPE == "arena") or (((TPT.DB.Dungeon and ZONE_TYPE == "party") or (TPT.DB.World and ZONE_TYPE == "none")) and GetNumGroupMembers() < 6)) ) then
+		if ( not ADDON_STATE ) then
+			ADDON_STATE = 1
 
 			TPT.Icons:Show()
 			TPT:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
@@ -665,8 +662,8 @@ function TPT:EnableCheck()
 				TPT.Anchors:Show()
 			end
 		end
-	elseif ( TPT.ENABLED ) then
-		TPT.ENABLED = nil
+	elseif ( ADDON_STATE ) then
+		ADDON_STATE = nil
 
 		TPT.Icons:Hide()
 		TPT:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
@@ -674,32 +671,31 @@ function TPT:EnableCheck()
 
 		TPT.Anchors:Hide()
 	end
+
+	return ADDON_STATE
 end
 
 function TPT:PLAYER_REGEN_ENABLED()
-	GROUP_ROSTER_UPDATE_DELAY(false)
+	GroupUpdate(false)
 	TPT:UnregisterEvent("PLAYER_REGEN_ENABLED")
 end
 
-function TPT:PARTY_CONVERTED_TO_RAID()
-	TPT:GROUP_ROSTER_UPDATE("Convert")
-end
-
 function TPT:GROUP_ROSTER_UPDATE(UpdateType)
-	local PartyPrevious = TPT.PARTY_NUM or 0
-	TPT.PARTY_NUM = GetNumSubgroupMembers()
+	local GroupIDLast = GROUP_ID
+	local GroupTypeLast = GROUP_TYPE
+	local GroupSubSizeLast = GROUP_SUB_SIZE or 0
 
-	if ( TPT.PARTY_NUM ~= PartyPrevious or UpdateType == "Convert" or UpdateType == "Zone" ) then
-		if ( ((TPT.PARTY_NUM == 0 and PartyPrevious > 0) or (TPT.PARTY_NUM > 0 and PartyPrevious == 0)) or UpdateType == "Zone" ) then
-			TPT:EnableCheck()
-		end
+	GROUP_ID = UnitGUID("party1") -- Sub-Group Changes
+	GROUP_TYPE = IsInRaid() and "raid" or "party" -- Group Type Converted
+	GROUP_SUB_SIZE = GetNumSubgroupMembers() -- Sub-Group Size
 
-		if ( not GROUP_ROSTER_UPDATE_DELAY_QUEUED and ValidZoneType() ) then
-			if ( TPT.PARTY_NUM < PartyPrevious ) then
-				GROUP_ROSTER_UPDATE_DELAY(false)
+	if ( GROUP_ID ~= GroupIDLast or GROUP_TYPE ~= GroupTypeLast or GROUP_SUB_SIZE ~= GroupSubSizeLast or UpdateType ) then
+		if ( AddonEnabled() and not GROUP_UPDATE_QUEUED ) then
+			if ( GROUP_SUB_SIZE < GroupSubSizeLast and ZONE_TYPE_PREVIOUS ~= "pvp" ) then
+				GroupUpdate(false)
 			else
-				TimerAfter(.6, GROUP_ROSTER_UPDATE_DELAY)
-				GROUP_ROSTER_UPDATE_DELAY_QUEUED = 1
+				TimerAfter(.7, GroupUpdate)
+				GROUP_UPDATE_QUEUED = 1
 			end
 		end
 	end
@@ -708,7 +704,7 @@ end
 local function UnitFrame()
 	if ( IsAddOnLoaded("CompactRaidFrame") and CUF_CVar:GetCVarBool("useCompactPartyFrames") ) then
 		UNIT_FRAME = "CompactRaidFrame"
-		hooksecurefunc("CompactRaidFrameManagerDisplayFrameProfileSelector_OnClick", GROUP_ROSTER_UPDATE_DELAY)
+		hooksecurefunc("CompactRaidFrameManagerDisplayFrameProfileSelector_OnClick", GroupUpdate)
 	elseif ( IsAddOnLoaded("ElvUI") ) then
 		UNIT_FRAME = "ElvUF_PartyGroup1UnitButton"
 	elseif ( IsAddOnLoaded("ShadowedUnitFrames") ) then
@@ -744,7 +740,6 @@ local function OnLoad()
 	TPT.Icons:Hide()
 
 	TPT:RegisterEvent("GROUP_ROSTER_UPDATE")
-	TPT:RegisterEvent("PARTY_CONVERTED_TO_RAID")
 	TPT:RegisterEvent("INSPECT_READY")
 end
 
@@ -756,15 +751,14 @@ function TPT:PLAYER_ENTERING_WORLD()
 	PLAYER_FACTION = UnitFactionGroup("player")
 
 	local _
-	PREVIOUS_ZONE_TYPE = CURRENT_ZONE_TYPE
-	_, CURRENT_ZONE_TYPE = IsInInstance()
+	ZONE_TYPE_PREVIOUS = ZONE_TYPE
+	_, ZONE_TYPE = IsInInstance()
 
 	-- Zone changed, or init load.
-	if ( PREVIOUS_ZONE_TYPE ~= CURRENT_ZONE_TYPE or TPT.PARTY_NUM == nil ) then
+	if ( ZONE_TYPE_PREVIOUS ~= ZONE_TYPE or GROUP_SUB_SIZE == nil ) then
 		TPT:QuerySpecStop()
 
-		if ( CURRENT_ZONE_TYPE == "arena" ) then
-			TPT.PARTY_NUM = 0
+		if ( ZONE_TYPE == "arena" ) then
 			StopAllIcons()
 		end
 
