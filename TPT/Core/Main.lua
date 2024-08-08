@@ -12,6 +12,7 @@ local Timer = C_Timer.NewTicker
 local TimerAfter = C_Timer.After
 local GetSpellInfo = GetSpellInfo
 local IsInInstance = IsInInstance
+local IsAddOnLoaded = IsAddOnLoaded
 local GetSpellTexture = C_GetSpellTexture
 local CooldownFrame_Set = CooldownFrame_Set
 local GetNumGroupMembers = GetNumGroupMembers
