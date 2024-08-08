@@ -669,6 +669,8 @@ local function AddonEnabled()
 		TPT:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 		TPT:QuerySpecStop()
 
+		GROUP_SUB_SIZE = 0
+		GroupUpdate(false)
 		TPT.Anchors:Hide()
 	end
 
