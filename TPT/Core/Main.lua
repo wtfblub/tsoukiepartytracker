@@ -14,6 +14,7 @@ local GetSpellInfo = GetSpellInfo
 local IsInInstance = IsInInstance
 local IsAddOnLoaded = IsAddOnLoaded
 local GetSpellTexture = C_GetSpellTexture
+local AnimateTexCoords = AnimateTexCoords
 local CooldownFrame_Set = CooldownFrame_Set
 local GetNumGroupMembers = GetNumGroupMembers
 local GetNumSubgroupMembers = GetNumSubgroupMembers
