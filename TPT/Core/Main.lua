@@ -38,8 +38,10 @@ local UNIT_FRAME
 local PLAYER_FACTION
 
 local HEX
+local GNAW
 local FERAL_CHARGE
 local AVENGING_WRATH
+local SUMMON_GARGOYLE
 local FERAL_CHARGE_CAT
 local FERAL_CHARGE_BEAR
 
@@ -529,10 +531,12 @@ function TPT:INSPECT_READY()
 				local Spent = Spent > 0
 
 				if ( Spent ) then
-					-- Feral Charge
+					-- TODO: Create better solution.
 					if ( Name == FERAL_CHARGE ) then
 						Anchor.Spec[FERAL_CHARGE_CAT] = 1
 						Name = FERAL_CHARGE_BEAR
+					elseif ( Name == SUMMON_GARGOYLE ) then
+						Anchor.Spec[GNAW] = 1
 					end
 
 					if ( TPT.Default.Spec[Name] ) then
@@ -728,10 +732,12 @@ local function OnLoad()
 	TPT.Options()
 
 	HEX = GetSpellInfo(51514)
+	GNAW = GetSpellInfo(47481)
 	FERAL_CHARGE = GetSpellInfo(49377)
-	FERAL_CHARGE_BEAR = GetSpellInfo(16979)
-	FERAL_CHARGE_CAT = GetSpellInfo(49376)
 	AVENGING_WRATH = GetSpellInfo(31884)
+	SUMMON_GARGOYLE = GetSpellInfo(49206)
+	FERAL_CHARGE_CAT = GetSpellInfo(49376)
+	FERAL_CHARGE_BEAR = GetSpellInfo(16979)
 
 	RACIAL_UNDEAD = GetSpellInfo(7744)
 	TRINKET_ALLIANCE = GetItemIcon(18854)
