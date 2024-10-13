@@ -41,7 +41,7 @@ local HEX
 local GNAW
 local FERAL_CHARGE
 local AVENGING_WRATH
-local SUMMON_GARGOYLE
+local MASTER_OF_GHOULS
 local FERAL_CHARGE_CAT
 local FERAL_CHARGE_BEAR
 
@@ -535,7 +535,7 @@ function TPT:INSPECT_READY()
 					if ( Name == FERAL_CHARGE ) then
 						Anchor.Spec[FERAL_CHARGE_CAT] = 1
 						Name = FERAL_CHARGE_BEAR
-					elseif ( Name == SUMMON_GARGOYLE ) then
+					elseif ( Name == MASTER_OF_GHOULS ) then
 						Anchor.Spec[GNAW] = 1
 					end
 
@@ -735,13 +735,13 @@ local function OnLoad()
 	GNAW = GetSpellInfo(47481)
 	FERAL_CHARGE = GetSpellInfo(49377)
 	AVENGING_WRATH = GetSpellInfo(31884)
-	SUMMON_GARGOYLE = GetSpellInfo(49206)
+	MASTER_OF_GHOULS = GetSpellInfo(52143)
 	FERAL_CHARGE_CAT = GetSpellInfo(49376)
 	FERAL_CHARGE_BEAR = GetSpellInfo(16979)
 
+	TRINKET_HORDE = GetItemIcon(18849)
 	RACIAL_UNDEAD = GetSpellInfo(7744)
 	TRINKET_ALLIANCE = GetItemIcon(18854)
-	TRINKET_HORDE = GetItemIcon(18849)
 
 	UnitFrame()
 
