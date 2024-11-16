@@ -62,7 +62,7 @@ function TPT:Locale()
 		local SpellName = GetSpellInfo(SpellID)
 
 		if ( SpellName ) then
-			Lang[SpellName] = GetSpellInfo(Value)
+			Lang[SpellName] = 1
 		end
 	end
 	TPT.Default.Spec = Lang

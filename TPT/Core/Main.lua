@@ -19,6 +19,8 @@ local CooldownFrame_Set = CooldownFrame_Set
 local GetNumGroupMembers = GetNumGroupMembers
 local GetNumSubgroupMembers = GetNumSubgroupMembers
 
+local WRATH = WOW_PROJECT_ID_RCE == WOW_PROJECT_WRATH_CLASSIC
+
 local ADDON_STATE
 
 local ZONE_TYPE
@@ -531,8 +533,7 @@ function TPT:INSPECT_READY()
 				local Spent = Spent > 0
 
 				if ( Spent ) then
-					-- TODO: Create better solution.
-					if ( Name == FERAL_CHARGE ) then
+					if ( Name == FERAL_CHARGE and FERAL_CHARGE_BEAR ) then
 						Anchor.Spec[FERAL_CHARGE_CAT] = 1
 						Name = FERAL_CHARGE_BEAR
 					elseif ( Name == MASTER_OF_GHOULS ) then
@@ -788,7 +789,7 @@ local function TriggerCooldown(SpellName, Anchor)
 			Start(Anchor, Icon)
 		elseif ( Icon.Name ) then
 			-- Undead Racial <-> PvP Trinket (45s)
-			if ( Anchor.Race == "Scourge" ) then
+			if ( Anchor.Race == "Scourge" and WRATH ) then
 				local Trinket = TPT.Default.Trinket[1][3]
 				if ( (Icon.Name == RACIAL_UNDEAD and SpellName == Trinket) or (Icon.Name == Trinket and SpellName == RACIAL_UNDEAD) ) then
 					if ( not Icon.Swipe:IsShown() ) then
@@ -817,11 +818,7 @@ end
 
 function TPT:COMBAT_LOG_EVENT_UNFILTERED(...)
 	local _, Event, _, SourceGUID, _, _, _, DestGUID, _, _, _, SpellID, SpellName, _, SpellType = CombatLogGetCurrentEventInfo(...)
-	local CastEvent = (Event == "SPELL_CAST_SUCCESS")
-
-	if ( (Event == "SPELL_AURA_APPLIED" or Event == "SPELL_MISSED") and SpellName == HEX ) then
-		CastEvent = 1 -- Bug
-	end
+	local CastEvent = (Event == "SPELL_CAST_SUCCESS") or ((Event == "SPELL_AURA_APPLIED" or Event == "SPELL_MISSED") and SpellName == HEX)
 
 	if ( CastEvent or Event == "SPELL_AURA_REMOVED" or Event == "SPELL_AURA_APPLIED" ) then
 		local Source, SourceID = GetUnitByGUID(SourceGUID)

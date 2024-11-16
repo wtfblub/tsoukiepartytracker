@@ -1,5 +1,7 @@
 <Ui>
-	<Script file="Default.lua"/>
+	<Script file="Default_WotLK.lua"/>
+	<Script file="Default_TBC.lua"/>
+	<Script file="Default_Vanilla.lua"/>
 	<Script file="Locale.lua"/>
 	<Script file="Helper.lua"/>
 	<Script file="Panel.lua"/>

@@ -1,14 +1,22 @@
+if ( WOW_PROJECT_ID_RCE ~= WOW_PROJECT_WRATH_CLASSIC ) then
+	return
+end
+
 local AddOn, TPT, Private = select(2, ...):Init()
 
 TPT.Version = 2
-
 TPT.Default = {}
 
 TPT.Default.Spells = {
 	["DRUID"] = {
 		{29166, 180}, -- Innervate
 		{22812, 60}, -- Barkskin
-		{8983, 60}, -- Bash
+		{5211, 60}, -- Bash
+		{1850, 300}, -- Dash
+		{16689, 60}, -- Nature's Grasp
+
+		{48505, 60}, -- Starfall
+		{50516, 20}, -- Typhoon
 
 		{50334, 180}, -- Berserk
 		{16979, 15}, -- Feral Charge - Bear
@@ -16,65 +24,66 @@ TPT.Default.Spells = {
 
 		{17116, 180}, -- Nature's Swiftness
 		{18562, 13}, -- Swiftmend
-
-		{53201, 60}, -- Starfall
-		{50516, 20}, -- Typhoon
 	},
 	["HUNTER"] = {
+		{1499, 28}, -- Freezing Trap
 		{3045, 300}, -- Rapid Fire
-		{14311, 28}, -- Freezing Trap
 		{19263, 90}, -- Deterrence
-		{19503, 30}, -- Scatter Shot
 		{34600, 30}, -- Snake Trap
 		{53271, 60}, -- Master's Call
-		{67481, 60}, -- Roar of Sacrifice
+		{53480, 60}, -- Roar of Sacrifice
 
 		{19574, 120}, -- Bestial Wrath
+		{19577, 60}, -- Intimidation
 
 		{34490, 20}, -- Silencing Shot
 		{23989, 180}, -- Readiness
 
-		{49012, 30}, -- Wyvern Sting
+		{19386, 30}, -- Wyvern Sting
+		{19503, 30}, -- Scatter Shot
 	},
 	["MAGE"] = {
-		{1953, 15}, -- Blink
 		{2139, 24}, -- Counterspell
+		{122, 25}, -- Frost Nova
+		{1953, 15}, -- Blink
 		{12051, 240}, -- Evocation
 		{45438, 300}, -- Ice Block
 
-		{44572, 40}, -- Deep Freeze
-		{11958, 384}, -- Cold Snap
+		{12043, 60}, -- Presence of Mind
+		{12042, 180}, -- Arcane Power
 
 		{11113, 30}, -- Blast Wave
 		{11129, 120}, -- Combustion
-		{42950, 20}, -- Dragon's Breath
+		{31661, 20}, -- Dragon's Breath
 
-		{12043, 60}, -- Presence of Mind
+		{44572, 40}, -- Deep Freeze
+		{11958, 384}, -- Cold Snap
+		{12472, 180}, -- Icy Veins
 	},
 	["PALADIN"] = {
-		{10308, 40}, -- Hammer of Justice
+		{853, 40}, -- Hammer of Justice
 		{1044, 25}, -- Hand of Freedom
-		{54428, 60}, -- Divine Plea
 		{6940, 120}, -- Hand of Sacrifice
-		{10278, 180}, -- Hand of Protection
-		{64205, 120}, -- Divine Sacrifice
+		{1022, 180}, -- Hand of Protection
 		{642, 300}, -- Divine Shield
 		{31884, 180}, -- Avenging Wrath
-
-		{66008, 60}, -- Repentance
+		{54428, 60}, -- Divine Plea
 
 		{20216, 120}, -- Divine Favor
 		{31821, 120}, -- Aura Mastery
 		{31842, 180}, -- Divine Illumination
 
-		{48827, 30}, -- Avenger's Shield
+		{64205, 120}, -- Divine Sacrifice
+		{31935, 30}, -- Avenger's Shield
+
+		{20066, 60}, -- Repentance
 	},
 	["PRIEST"] = {
 		{6346, 180}, -- Fear Ward
-		{10890, 27}, -- Psychic Scream
+		{8122, 27}, -- Psychic Scream
 		{34433, 300}, -- Shadowfiend
-		{48158, 12}, -- Shadow Word: Death
-		{48172, 120}, -- Desperate Prayer
+		{32379, 12}, -- Shadow Word: Death
+		{19236, 120}, -- Desperate Prayer
 		{64843, 480}, -- Divine Hymn
 		{64901, 360}, -- Hymn of Hope
 
@@ -82,7 +91,7 @@ TPT.Default.Spells = {
 		{33206, 144}, -- Pain Suppression
 
 		{47788, 180}, -- Guardian Spirit
-		{48086, 180}, -- Lightwell
+		{724, 180}, -- Lightwell
 
 		{47585, 75}, -- Dispersion
 		{15487, 45}, -- Silence
@@ -91,16 +100,17 @@ TPT.Default.Spells = {
 	["ROGUE"] = {
 		{1766, 10}, -- Kick
 		{2094, 120}, -- Blind
-		{8643, 20}, -- Kidney Shot
-		{26669, 180}, -- Evasion
-		{26889, 120}, -- Vanish
+		{408, 20}, -- Kidney Shot
+		{5277, 180}, -- Evasion
+		{1856, 120}, -- Vanish
 		{31224, 60}, -- Cloak of Shadows
 		{51722, 60}, -- Dismantle
 
 		{14177, 180}, -- Cold Blood
 
-		{51690, 120}, -- Killing Spree
+		{13877, 120}, -- Blade Flurry
 		{13750, 180}, -- Adrenaline Rush
+		{51690, 120}, -- Killing Spree
 
 		{14185, 300}, -- Preparation
 		{51713, 60}, -- Shadow Dance
@@ -108,8 +118,9 @@ TPT.Default.Spells = {
 	},
 	["SHAMAN"] = {
 		{57994, 5}, -- Wind Shear
-		{51514, 45}, -- Hex
 		{8177, 15}, -- Grounding Totem
+		{2484, 15}, -- Earthbind Totem
+		{51514, 45}, -- Hex
 
 		{59159, 35}, -- Thunderstorm
 		{16166, 180}, -- Elemental Mastery
@@ -118,17 +129,19 @@ TPT.Default.Spells = {
 		{51533, 180}, -- Feral Spirit
 
 		{16188, 120}, -- Nature's Swiftness
+		{16190, 300}, -- Mana Tide Totem
 	},
 	["WARLOCK"] = {
-		{17925, 120}, -- Death Coil
-		{18708, 180}, -- Fel Domination
-		{19647, 24}, -- Spell Lock
-		{48011, 8}, -- Devour Magic
+		{6789, 120}, -- Death Coil
+		{19244, 24}, -- Spell Lock
+		{19505, 8}, -- Devour Magic
+		{5484, 40}, -- Howl of Terror
 		{48020, 30}, -- Demonic Circle: Teleport
 
+		{18708, 180}, -- Fel Domination
 		{59672, 180}, -- Metamorphosis
 
-		{47847, 20}, -- Shadowfury
+		{30283, 20}, -- Shadowfury
 	},
 	["WARRIOR"] = {
 		{72, 12}, -- Shield Bash
@@ -138,13 +151,12 @@ TPT.Default.Spells = {
 		{2565, 60}, -- Shield Block
 		{3411, 30}, -- Intervene
 		{5246, 120}, -- Intimidating Shout
-		{11578, 13}, -- Charge
+		{100, 13}, -- Charge
 		{18499, 30}, -- Berserker Rage
 		{20230, 300}, -- Retaliation
 		{23920, 10}, -- Spell Reflection
-		{47996, 15}, -- Intercept
+		{20252, 15}, -- Intercept
 		{55694, 180}, -- Enraged Regeneration
-		{64382, 300}, -- Shattering Throw
 
 		{46924, 90}, -- Bladestorm
 
@@ -157,23 +169,26 @@ TPT.Default.Spells = {
 	["DEATHKNIGHT"] = {
 		{47528, 10}, -- Mind Freeze
 		{48743, 120}, -- Death Pact
-		{51052, 120}, -- Anti-Magic Zone
 		{49576, 35}, -- Death Grip
 		{48707, 45}, -- Anti-Magic Shell
-		{49039, 120}, -- Lichborne
 		{47476, 120}, -- Strangulate
-		{51271, 60}, -- Unbreakable Armor
 		{48792, 120}, -- Icebound Fortitude
 
+		{49016, 180}, -- Unholy Frenzy
+		{48982, 40}, -- Rune Tap
+		{55233, 60}, -- Vampiric Blood
+
 		{49203, 60}, -- Hungering Cold
+		{51271, 60}, -- Unbreakable Armor
+		{49039, 120}, -- Lichborne
 
 		{47481, 20}, -- Gnaw
-		{49206, 180}, -- Gargoyle
+		{49206, 180}, -- Summon Gargoyle
 	}
 }
 
 TPT.Default.Racial = {
--- ALIIANCE
+-- ALLIANCE
 	["Dwarf"] = {20594, 120},
 	["NightElf"] = {58984, 120},
 	["Gnome"] = {20589, 60},
@@ -182,9 +197,9 @@ TPT.Default.Racial = {
 -- HORDE
 	["Tauren"] = {20549, 120},
 	["Scourge"] = {7744, 120},
-	["BloodElf"] = {28730, 120},
 	["Orc"] = {20572, 120},
 	["Troll"] = {26297, 180},
+	["BloodElf"] = {28730, 120},
 }
 
 TPT.Default.Trinket = {
@@ -194,7 +209,7 @@ TPT.Default.Trinket = {
 
 TPT.Default.Spec = {
 -- MULTI
-	[17116] = 1, -- Nature's Swiftness / 16188
+	[16188] = 1, -- Nature's Swiftness
 
 -- DK
 	[48982] = 1, -- Rune Tap
@@ -230,11 +245,11 @@ TPT.Default.Spec = {
 	[20216] = 1, -- Divine Favor
 	[20473] = 1, -- Holy Shock
 	[31842] = 1, -- Divine Illumination
-	[48827] = 1, -- Avenger's Shield
+	[31935] = 1, -- Avenger's Shield
 	[64205] = 1, -- Divine Sacrifice
 	[20925] = 1, -- Holy Shield
 	[53595] = 1, -- Hammer of the Righteous
-	[66008] = 1, -- Repentance
+	[20066] = 1, -- Repentance
 	[35395] = 1, -- Crusader Strike
 	[53385] = 1, -- Divine Storm
 
@@ -243,12 +258,12 @@ TPT.Default.Spec = {
 	[12042] = 1, -- Arcane Power
 	[44425] = 1, -- Arcane Barrage
 	[11129] = 1, -- Combustion
-	[42950] = 1, -- Dragon's Breath
+	[31661] = 1, -- Dragon's Breath
 	[11113] = 1, -- Blast Wave
-	[11129] = 1, -- Combustion
 	[44572] = 1, -- Deep Freeze
 	[11958] = 1, -- Cold Snap
 	[12472] = 1, -- Icy Veins
+	[11426] = 1, -- Ice Barrier
 	[31687] = 1, -- Summon Water Elemental
 
 -- PRIEST
@@ -260,16 +275,16 @@ TPT.Default.Spec = {
 	[15487] = 1, -- Silence
 	[64044] = 1, -- Psychic Horror
 	[47788] = 1, -- Guardian Spirit
-	[48086] = 1, -- Lightwell
+	[724] = 1, -- Lightwell
 	[34861] = 1, -- Circle of Healing
-	[48172] = 1, -- Desperate Prayer
+	[19236] = 1, -- Desperate Prayer
 
 -- WARLOCK
 	[48181] = 1, -- Haunt
 	[18708] = 1, -- Fel Domination
 	[47193] = 1, -- Demonic Empowerment
 	[59672] = 1, -- Metamorphosis
-	[47847] = 1, -- Shadowfury
+	[30283] = 1, -- Shadowfury
 	[17877] = 1, -- Shadowburn
 	[17962] = 1, -- Conflagrate
 	[50796] = 1, -- Chaos Bolt
@@ -291,14 +306,14 @@ TPT.Default.Spec = {
 	[49376] = 1, -- Feral Charge - Cat
 	[16979] = 1, -- Feral Charge - Bear
 	[61336] = 1, -- Survival Instincts
-	[53201] = 1, -- Starfall
+	[48505] = 1, -- Starfall
 	[33831] = 1, -- Force of Nature
 	[50516] = 1, -- Typhoon
 	[18562] = 1, -- Swiftmend
 	[48438] = 1, -- Wild Growth
 
 -- SHAMAN
-	[59159] = 1, -- Thunderstorm
+	[51490] = 1, -- Thunderstorm
 	[16166] = 1, -- Elemental Mastery
 	[17364] = 1, -- Stormstrike
 	[60103] = 1, -- Lava Lash
@@ -317,20 +332,9 @@ TPT.Default.Spec = {
 	[23989] = 1, -- Readiness
 	[19503] = 1, -- Scatter Shot
 	[19306] = 1, -- Counterattack
-	[49012] = 1, -- Wyvern Sting
+	[19386] = 1, -- Wyvern Sting
 	[3674] = 1, -- Black Arrow
 	[53301] = 1, -- Explosive Shot
-}
-
-TPT.Default.Units = {
-	["party1"] = 1,
-	["party2"] = 2,
-	["party3"] = 3,
-	["party4"] = 4,
-	["partypet1"] = 1,
-	["partypet2"] = 2,
-	["partypet3"] = 3,
-	["partypet4"] = 4,
 }
 
 TPT.Default.Shared = {
@@ -339,20 +343,16 @@ TPT.Default.Shared = {
 		[49376] = 1, -- Feral Charge - Cat
 	},
 	["SHAMAN"] = {
-		[49231] = 1, -- Earth Shock
-		[49233] = 1, -- Flame Shock
-		[49236] = 1, -- Frost Shock
+		[8042] = 1, -- Earth Shock
+		[8050] = 1, -- Flame Shock
+		[8056] = 1, -- Frost Shock
 	},
 	["HUNTER"] = {
 		[60192] = 1, -- Freezing Arrow
-		[14311] = 1, -- Freezing Trap
+		[1499] = 1, -- Freezing Trap
 		[13809] = 1, -- Frost Trap
-		[49067] = 2, -- Explosive Trap
-		[49056] = 2, -- Immolation Trap
-	},
-	["MAGE"] = {
-		[43010] = 1,  -- Fire Ward
-		[43012] = 1,  -- Frost Ward
+		[13813] = 2, -- Explosive Trap
+		[13795] = 2, -- Immolation Trap
 	},
 	["WARRIOR"] = {
 		[72] = 1, -- Shield Bash
@@ -382,34 +382,48 @@ TPT.Default.Shared = {
 
 TPT.Default.Reset = {
 	[11958] = { -- Cold Snap
-		[42931] = 1, -- Cone of Cold
-		[42917] = 1, -- Frost Nova
-		[43012] = 1, -- Frost Ward
-		[43039] = 1, -- Ice Barrier
+		[120] = 1, -- Cone of Cold
+		[122] = 1, -- Frost Nova
+		[6143] = 1, -- Frost Ward
+		[11426] = 1, -- Ice Barrier
 		[45438] = 1, -- Ice Block
 		[31687] = 1, -- Summon Water Elemental
 		[44572] = 1, -- Deep Freeze
-		[44545] = 1, -- Fingers of Frost
 		[12472] = 1, -- Icy Veins
 	},
 	[14185] = { -- Preparation
 		[14177] = 1, -- Cold Blood
-		[26669] = 1, -- Evasion
-		[11305] = 1, -- Sprint
-		[26889] = 1, -- Vanish
+		[5277] = 1, -- Evasion
+		[2983] = 1, -- Sprint
+		[1856] = 1, -- Vanish
 		[36554] = 1, -- Shadowstep
 		[1766] = 1, -- Kick
 		[51722] = 1,-- Dismantle
 	},
 	[23989] = { -- Readiness
+		[53271] = 1, -- Master's Call
 		[19503] = 1, -- Scatter Shot
-		[60192] = 1, -- Freezing Arrow
-		[13809] = 1, -- Frost Trap
-		[14311] = 1, -- Freezing Trap
 		[19574] = 1, -- Bestial Wrath
 		[34490] = 1, -- Silencing Shot
 		[19263] = 1, -- Deterrence
-		[53271] = 1, -- Master's Call
-		[49012] = 1, -- Wyvern Sting
+		[19386] = 1, -- Wyvern Sting
+		[5384] = 1, -- Feign Death
+		[60192] = 1, -- Freezing Arrow
+		[13809] = 1, -- Frost Trap
+		[1499] = 1, -- Freezing Trap
+		[13813] = 1, -- Explosive Trap
+		[13795] = 1, -- Immolation Trap
+		[34600] = 1, -- Snake Trap
 	},
+}
+
+TPT.Default.Units = {
+	["party1"] = 1,
+	["party2"] = 2,
+	["party3"] = 3,
+	["party4"] = 4,
+	["partypet1"] = 1,
+	["partypet2"] = 2,
+	["partypet3"] = 3,
+	["partypet4"] = 4,
 }
