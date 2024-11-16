@@ -19,8 +19,6 @@ local CooldownFrame_Set = CooldownFrame_Set
 local GetNumGroupMembers = GetNumGroupMembers
 local GetNumSubgroupMembers = GetNumSubgroupMembers
 
-local WRATH = WOW_PROJECT_ID_RCE == WOW_PROJECT_WRATH_CLASSIC
-
 local ADDON_STATE
 
 local ZONE_TYPE
@@ -533,7 +531,7 @@ function TPT:INSPECT_READY()
 				local Spent = Spent > 0
 
 				if ( Spent ) then
-					if ( Name == FERAL_CHARGE and FERAL_CHARGE_BEAR ) then
+					if ( Name == FERAL_CHARGE ) then
 						Anchor.Spec[FERAL_CHARGE_CAT] = 1
 						Name = FERAL_CHARGE_BEAR
 					elseif ( Name == MASTER_OF_GHOULS ) then
@@ -789,7 +787,7 @@ local function TriggerCooldown(SpellName, Anchor)
 			Start(Anchor, Icon)
 		elseif ( Icon.Name ) then
 			-- Undead Racial <-> PvP Trinket (45s)
-			if ( Anchor.Race == "Scourge" and WRATH ) then
+			if ( Anchor.Race == "Scourge" and FERAL_CHARGE ) then -- If WotLK
 				local Trinket = TPT.Default.Trinket[1][3]
 				if ( (Icon.Name == RACIAL_UNDEAD and SpellName == Trinket) or (Icon.Name == Trinket and SpellName == RACIAL_UNDEAD) ) then
 					if ( not Icon.Swipe:IsShown() ) then
