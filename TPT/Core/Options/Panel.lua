@@ -536,9 +536,23 @@ function TPT.OptionOnLoad(Self, AddonName)
 			Scroll:SetPoint("TOPLEFT", Ability, 4, -4)
 			Scroll:SetPoint("BOTTOMRIGHT", Ability, -26, 4)
 
+			local LOCALIZED_CLASS_NAMES, LOCALIZED_CLASS_NAMES_DEFAULT = LOCALIZED_CLASS_NAMES_MALE, "DEATHKNIGHT"
+
+			if ( WOW_PROJECT_ID_RCE < WOW_PROJECT_WRATH_CLASSIC ) then
+				LOCALIZED_CLASS_NAMES = {}
+
+				for k,v in pairs(LOCALIZED_CLASS_NAMES_MALE) do
+					if ( k ~= LOCALIZED_CLASS_NAMES_DEFAULT ) then
+						LOCALIZED_CLASS_NAMES[k] = v
+					end
+				end
+
+				LOCALIZED_CLASS_NAMES_DEFAULT = "HUNTER"
+			end
+
 			Class = TPT.CreateDropdown(Panel, nil,
-				LOCALIZED_CLASS_NAMES_MALE,
-				function(Self) return Self.selectedValue or "DEATHKNIGHT" end,
+				LOCALIZED_CLASS_NAMES,
+				function(Self) return Self.selectedValue or LOCALIZED_CLASS_NAMES_DEFAULT end,
 				ClassChange,
 				true, nil, nil, nil,
 				ClassChangeColors())
