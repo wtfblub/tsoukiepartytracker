@@ -2,22 +2,26 @@ local AddOn, TPT, Private = select(2, ...):Init()
 
 local _G = _G
 
+local pairs = pairs
 local GetTime = GetTime
 local UIParent = UIParent
 local UnitGUID = UnitGUID
 local UnitRace = UnitRace
 local IsInRaid = IsInRaid
+local UnitBuff = UnitBuff
 local UnitClass = UnitClass
 local Timer = C_Timer.NewTicker
+local GameTooltip = GameTooltip
 local TimerAfter = C_Timer.After
 local GetSpellInfo = GetSpellInfo
 local IsInInstance = IsInInstance
 local IsAddOnLoaded = IsAddOnLoaded
 local GetSpellTexture = C_GetSpellTexture
-local AnimateTexCoords = AnimateTexCoords
 local CooldownFrame_Set = CooldownFrame_Set
 local GetNumGroupMembers = GetNumGroupMembers
 local GetNumSubgroupMembers = GetNumSubgroupMembers
+local ActionButton_ShowOverlayGlow = ActionButton_ShowOverlayGlow
+local ActionButton_HideOverlayGlow = ActionButton_HideOverlayGlow
 
 local ADDON_STATE
 
@@ -58,16 +62,10 @@ TPT.Anchors = CreateFrame("Frame", nil, UIParent)
 
 ]]
 
-local function AnimateTexCoords_OnUpdate(Self, Elapsed)
-	AnimateTexCoords(Self.A, 256, 256, 48, 48, 22, Elapsed, .02)
-end
-
 local function GlowHide(Icon)
-	if ( Icon.Glow and Icon.Glow.SetScript ) then
+	if ( Icon.overlay ) then
 		Icon.Swipe:SetAlpha(1)
-		Icon.Glow:Hide()
-		Icon.Glow:SetScript("OnUpdate", nil)
-		Icon.Glow.SetScript = nil
+		ActionButton_HideOverlayGlow(Icon)
 
 		if ( TPT.DB.Fade ) then
 			Icon.Texture:SetDesaturated(1)
@@ -81,23 +79,20 @@ local function Glow(SpellName, Event, Anchor)
 
 		if ( Icon.Name == SpellName ) then
 			if ( Event == "SPELL_AURA_APPLIED" ) then
-				if ( not Icon.Glow ) then
-					Icon.Glow = CreateFrame("Frame", nil, Icon, "TGlow")
+				local Name, _, _, _, _, Duration = UnitBuff(Anchor.Unit, SpellName)
+				if ( not Name or Duration < 1.5 ) then
+					return
 				end
 
+				ActionButton_ShowOverlayGlow(Icon)
+
 				Icon.Swipe:SetAlpha(0)
-				Icon.Glow:SetScript("OnUpdate", AnimateTexCoords_OnUpdate)
-				Icon.Glow:Show()
 
 				if ( TPT.DB.Fade ) then
 					Icon.Texture:SetDesaturated(nil)
 				end
 			else
 				GlowHide(Icon)
-
-				if ( Icon.Flash ) then
-					Icon.Flash.D:Play()
-				end
 			end
 
 			break
@@ -120,10 +115,12 @@ local function Start(Anchor, Icon, SetCD)
 		CooldownFrame_Set(Icon.Swipe, GetTime(), SetCD or Icon.CD, 1)
 
 		if ( TPT.DB.Glow and not SetCD ) then
-			if ( not Icon.Flash ) then
-				Icon.Flash = CreateFrame("Frame", nil, Icon, "TGlowFlash")
-			end
-			Icon.Flash.D:Play()
+			-- Flash
+			ActionButton_ShowOverlayGlow(Icon)
+			Icon.overlay.animIn:Stop()
+			Icon.overlay.animOut:Play()
+			Icon.overlay.ants.animOut:Stop()
+			Icon.overlay.ants:Hide()
 		end
 
 		if ( TPT.DB.Hidden ) then
@@ -263,6 +260,7 @@ local function StopAllIcons(Anchor, Hide)
 			local Icon = Icons[k]
 
 			GlowHide(Icon)
+
 			if ( Hide ) then
 				Icon:Hide()
 			else
@@ -687,7 +685,7 @@ function TPT:PLAYER_REGEN_ENABLED()
 	TPT:UnregisterEvent("PLAYER_REGEN_ENABLED")
 end
 
-function TPT:GROUP_ROSTER_UPDATE(UpdateType)
+function TPT:PARTY_MEMBERS_CHANGED(UpdateType)
 	local GroupIDLast = GROUP_ID
 	local GroupTypeLast = GROUP_TYPE
 	local GroupSubSizeLast = GROUP_SUB_SIZE or 0
@@ -748,7 +746,7 @@ local function OnLoad()
 	TPT.Icons:SetScale(TPT.DB.Scale or 1)
 	TPT.Icons:Hide()
 
-	TPT:RegisterEvent("GROUP_ROSTER_UPDATE")
+	TPT:RegisterEvent("PARTY_MEMBERS_CHANGED")
 	TPT:RegisterEvent("INSPECT_READY")
 end
 
@@ -771,7 +769,7 @@ function TPT:PLAYER_ENTERING_WORLD()
 			StopAllIcons()
 		end
 
-		TPT:GROUP_ROSTER_UPDATE("Zone")
+		TPT:PARTY_MEMBERS_CHANGED("Zone")
 	end
 end
 
@@ -824,13 +822,11 @@ function TPT:COMBAT_LOG_EVENT_UNFILTERED(...)
 		if ( Source ) then
 			local Anchor = TPT.Anchors[SourceID]
 
-			-- Classic: Buff BEFORE cast
 			if ( Anchor and Anchor.Active ) then
 				if ( CastEvent ) then
 					TriggerCooldown(SpellName, Anchor)
 				elseif ( SpellType == "BUFF" and DestGUID == SourceGUID and TPT.DB.Glow ) then
-					-- Blacklist: Berserk (Enchant), PvP Trinket, EMFH, EM
-					if ( SpellID ~= 59620 and SpellID ~= 42292 and SpellID ~= 59752 and SpellID ~= 64701 ) then
+					if ( SpellID ~= 59620 ) then -- Blacklist: Berserk (Enchant)
 						Glow(SpellName, Event, Anchor)
 					end
 				end

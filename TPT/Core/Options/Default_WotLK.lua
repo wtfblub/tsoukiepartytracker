@@ -119,7 +119,7 @@ TPT.Default.Spells = {
 	["SHAMAN"] = {
 		{57994, 5}, -- Wind Shear
 		{8177, 15}, -- Grounding Totem
-		{2484, 15}, -- Earthbind Totem
+		{2484, 10}, -- Earthbind Totem
 		{51514, 45}, -- Hex
 
 		{59159, 35}, -- Thunderstorm

@@ -12,6 +12,7 @@
 
 ---
 ### Features:
+- **CompactRaidFrame:** _Full support for [Tsoukie CompactRaidFrame](https://gitlab.com/Tsoukie/compactraidframe-3.3.5)_
 - **Spec Detection:** _Dynamic icons for units with different specs_
 - **Racials:** _All races supported_
 - **Linked Spells:** _Known spells that share a cooldown can be triggered by other shared spells_
