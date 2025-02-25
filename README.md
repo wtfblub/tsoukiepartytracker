@@ -18,7 +18,6 @@
 - **Linked Spells:** _Known spells that share a cooldown can be triggered by other shared spells_
 - **Icon Position:** _Change the position of each class spell_
 - **Animations:** _When an ability is used or active display visual cues - can be disabled_
-- **Compact Raid Frame:** _Attach to frame supported_
 - **Option Panel:** _Easily add, remove and disable spells, also change visual options such as alignment and size_
 - **Much more:** _Many more features such as Grow Left, Rows, Tooltips etc!_
 
