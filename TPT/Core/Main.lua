@@ -435,7 +435,7 @@ function TPT:AnchorUpdate(i)
 			local AbilityName = TPT.Default.SpellName[AbilityInfo[1]]
 			local AbilityStatus = AbilityInfo[3]
 
-			if ( AbilityStatus ~= false and (Spec and Spec[AbilityName] or not TPT.Default.Spec[AbilityName]) ) then
+			if ( AbilityStatus ~= false and ((Spec and Spec[AbilityName]) or not TPT.Default.Spec[AbilityName]) ) then
 				_, Num = IconSet(Anchor, Num, AbilityInfo, Time)
 			end
 		end

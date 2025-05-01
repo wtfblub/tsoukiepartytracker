@@ -9,27 +9,29 @@ local GetSpellInfo = GetSpellInfo
 local StringFormat = string.format
 local GetSpellTexture = C_GetSpellTexture or GetSpellTexture
 
-function TPT.Options()
+function TPT.Options(Reset)
 	local _, AddonName = GetAddOnInfo(AddOn)
 
-	if ( not TPTDB or TPT.Version ~= TPTDB.V ) then
-		print(AddonName, ": Initialize")
+	if ( not TPTDB or TPT.Version ~= TPTDB.V or Reset ) then
+		print(AddonName, (TPTDB and TPT.Version > TPTDB.V and ": Settings reverted to default due to addon structural changes. :(" or ": Installed"))
 		TPTDB = { Spells = TPT.Default.Spells, Position = {}, Scale = 1, OffY = 0, OffX = 0, SpaceX = 0, Glow = 1, World = 1, Arena = 1, Trinket = 1, V = TPT.Version }
 	end
-	TPT.DB = TPTDB
 
-	-- Deprecated
-	TPT.DB.Border = nil
-
-	TPT:Locale()
-	TPT.OptionPanel(AddonName, TPT.OptionOnLoad, "/tpt", "/pab")
+	if ( not Reset ) then
+		TPT.DB = TPTDB
+		TPT:Locale()
+		TPT.OptionPanel(AddonName, TPT.OptionOnLoad, "/tpt", "/pab")
+	end
 end
 
 function TPT.OptionOnLoad(Self, AddonName)
 	TPT.OptionPanelHelper()
 
 	local Panel = Self
-	Panel.Default = function()end
+	Panel.Default = function()
+		TPT.Options(true)
+		ReloadUI()
+	end
 
 	local Header, Parent, Attach, Lock,
 	Display, Scale, Hidden, Glow, Fade, GrowLeft, Rows, Tooltip,
