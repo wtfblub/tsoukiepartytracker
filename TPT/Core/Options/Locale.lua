@@ -1,5 +1,6 @@
 local AddOn, TPT, Private = select(2, ...):Init()
 
+local pairs = pairs
 local GetSpellInfo = GetSpellInfo
 
 local function LocaleName(Array)

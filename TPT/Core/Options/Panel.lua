@@ -51,7 +51,7 @@ function TPT.OptionOnLoad(Self, AddonName)
 
 				if ( GroupSubSize > 0 and Type ) then
 					if ( Type == "Zone" ) then
-						TPT:GROUP_ROSTER_UPDATE(Type)
+						TPT:PARTY_MEMBERS_CHANGED(Type)
 					else
 						for i=1, GroupSubSize do
 							if ( TPT.Anchors[i] ) then

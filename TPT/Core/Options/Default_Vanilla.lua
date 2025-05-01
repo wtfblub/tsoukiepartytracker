@@ -264,15 +264,20 @@ TPT.Default.Shared = {
 		[633] = 1, -- Lay on Hands
 	},
 
-	-- SPECIAL CD(S)
+	-- SPECIAL SHARED CD(S)
 	["CD"] = {
+		[72] = 12,
+		[6552] = 10,
 		[871] = 12,
 		[20230] = 12,
 		[1719] = 12,
 		[642] = 60,
 		[498] = 60,
 		[633] = 60,
-	}
+	},
+	["CD_FALLBACK"] = {
+
+	},
 }
 
 TPT.Default.Reset = {

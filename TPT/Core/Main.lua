@@ -44,7 +44,6 @@ local PLAYER_FACTION
 local HEX
 local GNAW
 local FERAL_CHARGE
-local AVENGING_WRATH
 local MASTER_OF_GHOULS
 local FERAL_CHARGE_CAT
 local FERAL_CHARGE_BEAR
@@ -731,7 +730,6 @@ local function OnLoad()
 	HEX = GetSpellInfo(51514)
 	GNAW = GetSpellInfo(47481)
 	FERAL_CHARGE = GetSpellInfo(49377)
-	AVENGING_WRATH = GetSpellInfo(31884)
 	MASTER_OF_GHOULS = GetSpellInfo(52143)
 	FERAL_CHARGE_CAT = GetSpellInfo(49376)
 	FERAL_CHARGE_BEAR = GetSpellInfo(16979)
@@ -798,8 +796,8 @@ local function TriggerCooldown(SpellName, Anchor)
 			local SharedClassSpells = TPT.Default.Shared[Anchor.Class]
 			if ( SharedClassSpells ) then
 				local SharedSpellType = SharedClassSpells[SpellName]
-				if ( SharedSpellType and SharedSpellType == SharedClassSpells[Icon.Name] and not Icon.Swipe:IsShown() ) then
-					Start(Anchor, Icon, (SpellName == AVENGING_WRATH) and 30 or TPT.Default.Shared.CD[Icon.Name])
+				if ( SharedSpellType and SharedSpellType == SharedClassSpells[Icon.Name] and Icon.Swipe:GetCooldownDuration() < 1 ) then
+					Start(Anchor, Icon, TPT.Default.Shared.CD[SpellName] or TPT.Default.Shared.CD_FALLBACK[Icon.Name] or TPT.Default.Shared.CD[Icon.Name])
 				end
 			end
 
