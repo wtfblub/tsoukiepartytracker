@@ -13,7 +13,7 @@ function TPT.Options(Reset)
 	local _, AddonName = GetAddOnInfo(AddOn)
 
 	if ( not TPTDB or TPT.Version ~= TPTDB.V or Reset ) then
-		print(AddonName, (TPTDB and TPT.Version > TPTDB.V and ": Settings reverted to default due to addon structural changes. :(" or ": Installed"))
+		print(AddonName, TPTDB and ": Settings reverted to default due to addon structural changes." or ": Installed")
 		TPTDB = { Spells = TPT.Default.Spells, Position = {}, Scale = 1, OffY = 0, OffX = 0, SpaceX = 0, Glow = 1, World = 1, Arena = 1, Trinket = 1, V = TPT.Version }
 	end
 
