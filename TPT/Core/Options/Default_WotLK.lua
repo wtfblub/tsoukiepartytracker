@@ -151,11 +151,11 @@ TPT.Default.Spells = {
 		{2565, 60}, -- Shield Block
 		{3411, 30}, -- Intervene
 		{5246, 120}, -- Intimidating Shout
-		{100, 13}, -- Charge
+		{100, 20}, -- Charge
 		{18499, 30}, -- Berserker Rage
 		{20230, 300}, -- Retaliation
 		{23920, 10}, -- Spell Reflection
-		{20252, 15}, -- Intercept
+		{20252, 25}, -- Intercept
 		{55694, 180}, -- Enraged Regeneration
 
 		{46924, 90}, -- Bladestorm
