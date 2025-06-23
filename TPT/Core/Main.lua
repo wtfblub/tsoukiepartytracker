@@ -455,22 +455,17 @@ end
 
 ]]
 
-local function InvalidSpecQuery()
-	if InCombatLockdown() or 
-	QUERY_TALENT_ID or
-	UnitIsDead("player") or
-	(InspectFrame and InspectFrame:IsShown())
-	then return 1 end
-end
-
 local function QuerySpec()
-	if ( QUERY_TALENT_TIMEOUT and QUERY_TALENT_TIMEOUT >= 12 ) then -- 1*12 = 12
+	if ( InspectFrame and InspectFrame:IsShown() ) then
+		QUERY_TALENT_TIMEOUT = nil
+		return
+	elseif ( QUERY_TALENT_TIMEOUT and QUERY_TALENT_TIMEOUT >= 12 ) then
 		TPT:QuerySpecStop()
 	else
 		QUERY_TALENT_TIMEOUT = (QUERY_TALENT_TIMEOUT or 0) + 1
 	end
 
-	if ( not InvalidSpecQuery() ) then
+	if ( not (QUERY_TALENT_ID or UnitIsDead("player")) ) then
 		if ( GROUP_SUB_SIZE > 0 ) then
 			for i=1, GROUP_SUB_SIZE do
 				local Anchor = TPT.Anchors[i]
@@ -511,7 +506,7 @@ end
 function TPT:INSPECT_READY()
 	local Anchor = (QUERY_TALENT_ID) and TPT.Anchors[QUERY_TALENT_ID]
 
-	if ( InCombatLockdown() or (InspectFrame and InspectFrame:IsShown()) or not Anchor or not Anchor.Class or not Anchor.Active ) then
+	if ( not Anchor or not Anchor.Class or not Anchor.Active or (InspectFrame and InspectFrame:IsShown()) ) then
 		QUERY_TALENT_ID = nil
 		return
 	end
@@ -684,7 +679,7 @@ function TPT:PLAYER_REGEN_ENABLED()
 	TPT:UnregisterEvent("PLAYER_REGEN_ENABLED")
 end
 
-function TPT:PARTY_MEMBERS_CHANGED(UpdateType)
+function TPT:GROUP_ROSTER_UPDATE(UpdateType)
 	local GroupIDLast = GROUP_ID
 	local GroupTypeLast = GROUP_TYPE
 	local GroupSubSizeLast = GROUP_SUB_SIZE or 0
@@ -744,7 +739,7 @@ local function OnLoad()
 	TPT.Icons:SetScale(TPT.DB.Scale or 1)
 	TPT.Icons:Hide()
 
-	TPT:RegisterEvent("PARTY_MEMBERS_CHANGED")
+	TPT:RegisterEvent("GROUP_ROSTER_UPDATE")
 	TPT:RegisterEvent("INSPECT_READY")
 end
 
@@ -767,7 +762,7 @@ function TPT:PLAYER_ENTERING_WORLD()
 			StopAllIcons()
 		end
 
-		TPT:PARTY_MEMBERS_CHANGED("Zone")
+		TPT:GROUP_ROSTER_UPDATE("Zone")
 	end
 end
 
@@ -823,7 +818,7 @@ function TPT:COMBAT_LOG_EVENT_UNFILTERED(...)
 			if ( Anchor and Anchor.Active ) then
 				if ( CastEvent ) then
 					TriggerCooldown(SpellName, Anchor)
-				elseif ( SpellType == "BUFF" and DestGUID == SourceGUID and TPT.DB.Glow ) then
+				elseif ( SpellType == "BUFF" and DestGUID == Anchor.GUID and TPT.DB.Glow ) then
 					if ( SpellID ~= 59620 ) then -- Blacklist: Berserk (Enchant)
 						Glow(SpellName, Event, Anchor)
 					end

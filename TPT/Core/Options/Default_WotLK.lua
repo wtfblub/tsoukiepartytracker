@@ -405,6 +405,7 @@ TPT.Default.Reset = {
 		[51722] = 1,-- Dismantle
 	},
 	[23989] = { -- Readiness
+		[3045] = 1, -- Rapid Fire
 		[53271] = 1, -- Master's Call
 		[19503] = 1, -- Scatter Shot
 		[19574] = 1, -- Bestial Wrath

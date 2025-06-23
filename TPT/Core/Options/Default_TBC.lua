@@ -321,6 +321,7 @@ TPT.Default.Reset = {
 		[1766] = 1, -- Kick
 	},
 	[23989] = { -- Readiness
+		[3045] = 1, -- Rapid Fire
 		[19503] = 1, -- Scatter Shot
 		[19574] = 1, -- Bestial Wrath
 		[34490] = 1, -- Silencing Shot
