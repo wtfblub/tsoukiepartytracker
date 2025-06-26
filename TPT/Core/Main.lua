@@ -32,9 +32,7 @@ local GROUP_ID
 local GROUP_TYPE
 local GROUP_SUB_SIZE
 
-local QUERY_TALENT
-local QUERY_TALENT_ID
-local QUERY_TALENT_TIMEOUT
+local QUERY_SPEC
 
 local GROUP_UPDATE_QUEUED
 
@@ -246,7 +244,6 @@ local function IconSet(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 	Icon.Name = Name
 	Icon.ID = ID
 	Icon.CD = CD
-	Icon.GUID = Anchor.GUID
 
 	return Icon, (Num + 1)
 end
@@ -451,111 +448,6 @@ end
 
 --[[
 
-	TALENT
-
-]]
-
-local function QuerySpec()
-	if ( InspectFrame and InspectFrame:IsShown() ) then
-		QUERY_TALENT_TIMEOUT = nil
-		return
-	elseif ( QUERY_TALENT_TIMEOUT and QUERY_TALENT_TIMEOUT >= 12 ) then
-		TPT:QuerySpecStop()
-	else
-		QUERY_TALENT_TIMEOUT = (QUERY_TALENT_TIMEOUT or 0) + 1
-	end
-
-	if ( not (QUERY_TALENT_ID or UnitIsDead("player")) ) then
-		if ( GROUP_SUB_SIZE > 0 ) then
-			for i=1, GROUP_SUB_SIZE do
-				local Anchor = TPT.Anchors[i]
-				if ( not Anchor ) then return end
-
-				if ( not Anchor.Spec ) then
-					local Unit = Anchor.Unit
-
-					if ( Unit and UnitIsConnected(Unit) and CheckInteractDistance(Unit, 1) and CanInspect(Unit) ) then
-						QUERY_TALENT_ID = i
-						NotifyInspect(Unit)
-						break
-					end
-				end
-			end
-		else
-			TPT:QuerySpecStop()
-		end
-	end
-end
-
-function TPT:QuerySpecStart()
-	if ( (QUERY_TALENT and QUERY_TALENT:IsCancelled()) or not QUERY_TALENT ) then
-		QUERY_TALENT = Timer(1, QuerySpec)
-		QuerySpec()
-	end
-end
-
-function TPT:QuerySpecStop()
-	if ( QUERY_TALENT and not QUERY_TALENT:IsCancelled() ) then
-		QUERY_TALENT_TIMEOUT = nil
-		QUERY_TALENT_ID = nil
-		QUERY_TALENT:Cancel()
-		ClearInspectPlayer()
-	end
-end
-
-function TPT:INSPECT_READY()
-	local Anchor = (QUERY_TALENT_ID) and TPT.Anchors[QUERY_TALENT_ID]
-
-	if ( not Anchor or not Anchor.Class or not Anchor.Active or (InspectFrame and InspectFrame:IsShown()) ) then
-		QUERY_TALENT_ID = nil
-		return
-	end
-
-	Anchor.Spec = {}
-	local Found
-	local TalentGroup = GetActiveTalentGroup(true)
-
-	for Tab = 1, 3 do
-		for Talent = 1, 31 do
-			local Name, _, _, _, Spent = GetTalentInfo(Tab, Talent, true, false, TalentGroup)
-
-			if ( Name ) then
-				local Spent = Spent > 0
-
-				if ( Spent ) then
-					if ( Name == FERAL_CHARGE ) then
-						Anchor.Spec[FERAL_CHARGE_CAT] = 1
-						Name = FERAL_CHARGE_BEAR
-					elseif ( Name == MASTER_OF_GHOULS ) then
-						Anchor.Spec[GNAW] = 1
-					end
-
-					if ( TPT.Default.Spec[Name] ) then
-						Found = true
-						Anchor.Spec[Name] = Spent
-					end
-				end
-			end
-		end
-	end
-
-	if ( Found ) then
-		TPT:AnchorUpdate(QUERY_TALENT_ID) -- Update icons.
-	else
-		Anchor.Spec = nil
-	end
-
-	if ( QUERY_TALENT_ID == GROUP_SUB_SIZE ) then
-		TPT:QuerySpecStop()
-	end
-
-	ClearInspectPlayer()
-	QUERY_TALENT_ID = nil
-	QUERY_TALENT_TIMEOUT = nil
-end
-
---[[
-
 	GROUP
 
 ]]
@@ -626,9 +518,9 @@ local function GroupUpdate(Delayed)
 						TPT:IconUpdate(i)
 					end
 
-					QUERY_TALENT_ID = nil
-					QUERY_TALENT_TIMEOUT = nil
 					TPT:QuerySpecStart()
+					QUERY_SPEC.ID = nil
+					QUERY_SPEC.TIMEOUT = nil
 				end
 
 				TPT:AnchorUpdatePosition(i)
@@ -645,6 +537,109 @@ local function GroupUpdate(Delayed)
 
 	GROUP_UPDATE_QUEUED = nil
 	ZONE_TYPE_PREVIOUS = ZONE_TYPE
+end
+
+--[[
+
+	TALENT
+
+]]
+
+local function QuerySpec()
+	if ( InspectFrame and InspectFrame:IsShown() ) then
+		QUERY_SPEC.TIMEOUT = nil
+		return
+	elseif ( QUERY_SPEC.TIMEOUT and QUERY_SPEC.TIMEOUT > 4 ) then
+		return TPT:QuerySpecStop()
+	else
+		QUERY_SPEC.TIMEOUT = (QUERY_SPEC.TIMEOUT or 0) + 1
+	end
+
+	if ( not (QUERY_SPEC.ID or UnitIsDead("player")) ) then
+		local Total = 0
+
+		if ( GROUP_SUB_SIZE > 0 ) then
+			for i=1, GROUP_SUB_SIZE do
+				local Anchor = TPT.Anchors[i]
+				if ( not Anchor ) then return end
+
+				if ( Anchor.Spec ) then
+					Total = Total + 1
+				else
+					local Unit = Anchor.Unit
+					if ( Unit and UnitIsConnected(Unit) and CheckInteractDistance(Unit, 1) and CanInspect(Unit) ) then
+						QUERY_SPEC.ID = i
+						return NotifyInspect(Unit)
+					end
+				end
+			end
+		end
+
+		if ( Total == GROUP_SUB_SIZE ) then
+			TPT:QuerySpecStop()
+		end
+	end
+end
+
+function TPT:QuerySpecStart()
+	if ( not QUERY_SPEC ) then
+		QUERY_SPEC = Timer(1, QuerySpec)
+		QuerySpec()
+	end
+end
+
+function TPT:QuerySpecStop()
+	if ( QUERY_SPEC ) then
+		QUERY_SPEC:Cancel()
+		ClearInspectPlayer()
+		QUERY_SPEC = nil
+	end
+end
+
+function TPT:INSPECT_READY(GUID)
+	if ( ADDON_STATE ) then
+		local UnitID, AnchorID = GetUnitByGUID(GUID)
+		local Anchor = TPT.Anchors[AnchorID]
+
+		if ( Anchor and Anchor.Active and not Anchor.Spec ) then
+			local Talent, Found = {}
+
+			for Tab = 1, 3 do
+				for Index = 1, 31 do
+					local Name, _, _, _, Spent = GetTalentInfo(Tab, Index, true)
+
+					if ( Name ) then
+						local Spent = Spent > 0
+
+						if ( Spent ) then
+							if ( Name == FERAL_CHARGE ) then
+								Talent[FERAL_CHARGE_CAT] = 1
+								Name = FERAL_CHARGE_BEAR
+							elseif ( Name == MASTER_OF_GHOULS ) then
+								Talent[GNAW] = 1
+							end
+
+							if ( TPT.Default.Spec[Name] ) then
+								Found = true
+								Talent[Name] = Spent
+							end
+						end
+					end
+				end
+			end
+
+			if ( Found ) then
+				Anchor.Spec = Talent
+				TPT:AnchorUpdate(AnchorID) -- Refresh
+
+				if ( QUERY_SPEC and QUERY_SPEC.ID == AnchorID ) then
+					QUERY_SPEC.ID = nil
+					QUERY_SPEC.TIMEOUT = nil
+					ClearInspectPlayer()
+				end
+			end
+		end
+	end
 end
 
 local function AddonEnabled()
