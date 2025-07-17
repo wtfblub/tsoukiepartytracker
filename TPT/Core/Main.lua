@@ -190,11 +190,11 @@ local function CooldownOnHide(Self)
 	local Icon = Self:GetParent()
 	GlowHide(Icon)
 
-	if ( TPT.DB.Hidden ) then
-		if ( Icon.Anchor.Active ) then
-			TPT:IconUpdate(Icon.Anchor.i)
-		end
-	elseif ( TPT.DB.Fade ) then
+	if ( TPT.DB.Hidden and Icon.Anchor.Active ) then
+		TPT:IconUpdate(Icon.Anchor.i)
+	end
+	
+	if ( TPT.DB.Fade and not Self:IsShown() ) then
 		Icon.Texture:SetDesaturated(nil)
 	end
 end
@@ -239,11 +239,12 @@ local function IconSet(Anchor, Num, Ability, Time, Name, ID, CD, Texture)
 		Texture = GetSpellTexture(ID)
 	end
 
-	Icon.Texture:SetTexture(Texture)
-	Icon.Texture:SetDesaturated(nil)
 	Icon.Name = Name
 	Icon.ID = ID
 	Icon.CD = CD
+
+	Icon.Texture:SetTexture(Texture)
+	Icon.Texture:SetDesaturated(TPT.DB.Fade and Icon.Swipe:IsShown())
 
 	return Icon, (Num + 1)
 end
