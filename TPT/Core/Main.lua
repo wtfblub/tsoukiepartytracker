@@ -16,9 +16,14 @@ local TimerAfter = C_Timer.After
 local GetSpellInfo = GetSpellInfo
 local IsInInstance = IsInInstance
 local IsAddOnLoaded = IsAddOnLoaded
+local GetTalentInfo = GetTalentInfo
+local GetTalentTabInfo = GetTalentTabInfo
+local InCombatLockdown = InCombatLockdown
 local GetSpellTexture = C_GetSpellTexture
 local CooldownFrame_Set = CooldownFrame_Set
 local GetNumGroupMembers = GetNumGroupMembers
+local ClearInspectPlayer = ClearInspectPlayer
+local GetActiveTalentGroup = GetActiveTalentGroup
 local GetNumSubgroupMembers = GetNumSubgroupMembers
 local ActionButton_ShowOverlayGlow = ActionButton_ShowOverlayGlow
 local ActionButton_HideOverlayGlow = ActionButton_HideOverlayGlow
@@ -604,40 +609,46 @@ function TPT:INSPECT_READY(GUID)
 
 		if ( Anchor and Anchor.Active and not Anchor.Spec ) then
 			local Talent, Found = {}
+			local Group = GetActiveTalentGroup(true)
 
 			for Tab = 1, 3 do
-				for Index = 1, 31 do
-					local Name, _, _, _, Spent = GetTalentInfo(Tab, Index, true)
+				local _, _, Total = GetTalentTabInfo(Tab, true, false, Group)
 
-					if ( Name ) then
-						local Spent = Spent > 0
+				if ( Total > 0 ) then
+					for Index = 1, 31 do
+						local Name, _, _, _, Spent = GetTalentInfo(Tab, Index, true, false, Group)
 
-						if ( Spent ) then
-							if ( Name == FERAL_CHARGE ) then
-								Talent[FERAL_CHARGE_CAT] = 1
-								Name = FERAL_CHARGE_BEAR
-							elseif ( Name == MASTER_OF_GHOULS ) then
-								Talent[GNAW] = 1
-							end
+						if ( Name ) then
+							local Spent = Spent > 0
 
-							if ( TPT.Default.Spec[Name] ) then
-								Found = true
-								Talent[Name] = Spent
+							if ( Spent ) then
+								if ( Name == FERAL_CHARGE ) then
+									Talent[FERAL_CHARGE_CAT] = true
+									Name = FERAL_CHARGE_BEAR
+								elseif ( Name == MASTER_OF_GHOULS ) then
+									Name = GNAW
+								end
+
+								if ( TPT.Default.Spec[Name] ) then
+									Found = true
+									Talent[Name] = Spent
+								end
 							end
 						end
 					end
 				end
 			end
 
-			if ( Found ) then
-				Anchor.Spec = Talent
-				TPT:AnchorUpdate(AnchorID) -- Refresh
+			Anchor.Spec = Talent
 
-				if ( QUERY_SPEC and QUERY_SPEC.ID == AnchorID ) then
-					QUERY_SPEC.ID = nil
-					QUERY_SPEC.TIMEOUT = nil
-					ClearInspectPlayer()
-				end
+			if ( Found ) then
+				TPT:AnchorUpdate(AnchorID)
+			end
+
+			if ( QUERY_SPEC and QUERY_SPEC.ID == AnchorID ) then
+				QUERY_SPEC.ID = nil
+				QUERY_SPEC.TIMEOUT = nil
+				ClearInspectPlayer()
 			end
 		end
 	end

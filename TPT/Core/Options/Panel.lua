@@ -109,6 +109,11 @@ function TPT.OptionOnLoad(Self, AddonName)
 					Lock:Disable()
 					OffsetY:Enable()
 					OffsetX:Enable()
+
+					local Postion = TPT.DB.Position
+					if ( Postion[1] ) then
+						wipe(Postion)
+					end
 				else
 					OffsetX:Disable()
 					OffsetY:Disable()
