@@ -1,66 +1,78 @@
-# Tsoukie Party Tracker for 3.3.5a client (WotLK, TBC, Vanilla)
-**`Extremely lightweight & powerful Party Ability Bar/OmniCD.`**
+<a><img src="https://gitlab.com/-/project/72272686/uploads/957164475df1d0eaf9c07abcf3e03a56/intro.jpg" width="100%" /></a>
 
-<img src="https://i.imgur.com/BDhhyiF.jpeg" width="100%">
+<br />
 
----
+# Tsoukie Party Tracker
 
-### 📥 [Installation](#-installation-1)
-### 📋 [Report Issue](https://gitlab.com/Tsoukie/tsoukiepartytracker/-/issues)
-### 💬 [FAQ](#-faq-1)
-### ❤️ [Support & Credit](#%EF%B8%8F-support-credit-1)
+An addon crafted to improve your awareness of party abilities during gameplay, automatically identifying and displaying each member's unique specialization skills, ensuring you know exactly what your group can do. Including full support for all racial spells. Whenever an ability is activated or currently in use, [**Tsoukie Party Tracker**](#) provides clear visual cues, keeping you informed and enabling you to react swiftly to any situation. Elevate your experience and improve your team's coordination!
 
----
-### Features:
-- **CompactRaidFrame:** _Full support for [Tsoukie CompactRaidFrame](https://gitlab.com/Tsoukie/compactraidframe-3.3.5)_
-- **Spec Detection:** _Dynamic icons for units with different specs_
-- **Racials:** _All races supported_
-- **Linked Spells:** _Known spells that share a cooldown can be triggered by other shared spells_
-- **Icon Position:** _Change the position of each class spell_
-- **Animations:** _When an ability is used or active display visual cues - can be disabled_
-- **Option Panel:** _Easily add, remove and disable spells, also change visual options such as alignment and size_
-- **Much more:** _Many more features such as Grow Left, Rows, Tooltips etc!_
+#### ⋮ KEY FEATURES
 
-### Commands:
-- **`/tpt`** _Display option panel_
-- **`/pab`** _Display option panel_
+- Specialization detection and racial support.
+- Visual cues when abilities active or used.
+- Tooltips so you're able to learn about each spell when displayed.
+- Options to add, remove, disable or change order of each ability.
+- Many customizable visual options, such as icon size, alignment, spacing and rows.
+- Option to automatically anchor to the corresponding party unit frame.
+- Popular unit frame addon support such as ElvUI, XPerl, Pitbull, Grid, CompactRaidFrame etc.
+- Crafted to be extremely lightweight.
 
-<!-- blank line -->
-<br>
-<!-- blank line -->
+#### ⋮ COMMANDS
 
-# 📥 Installation
+<kbd>/tpt</kbd> <kbd>/pab</kbd> 
 
-1. Download Latest Release `[.zip, .gz, ...]`:
-    - <a href="https://gitlab.com/Tsoukie/tsoukiepartytracker/-/releases/permalink/latest" target="_blank">`📥 TPT`</a>
-	- <a href="https://gitlab.com/Tsoukie/classicapi/-/releases/permalink/latest" target="_blank">`📥 ClassicAPI`</a> **⚠Required**
-2. Extract the downloaded compressed files _(eg. Right-Click -> Extract-All)_.
-3. Navigate within each extracted folder(s) looking for the following: `TPT` or `!!!ClassicAPI`.
-4. Move folder(s) named `TPT` or `!!!ClassicAPI` to your `Interface\AddOns\` folder.
-5. Re-launch game.
+> [!note] ↳ Still looking for more information?
+> You may find additional details on the [**Wiki**](https://gitlab.com/Tsoukie/tsoukiepartytracker/-/wikis/home).
 
-<!-- blank line -->
-<br>
-<!-- blank line -->
+<br />
 
+<a><img src="https://gitlab.com/-/project/72272686/uploads/2d1f503f93a75c725b6d71f76eb2a565/teaser.jpg" width="100%" /></a>
 
-# 💬 FAQ
+<br />
 
-> I found a bug!
+# Download & Install
 
-Please 📋 [report the issue](https://gitlab.com/Tsoukie/tsoukiepartytracker/-/issues) with as much detail as possible.
+Latest Release and Changes `[.zip, .tar.gz, ...]`:
 
-<!-- blank line -->
-<br>
-<!-- blank line -->
+#### &nbsp;&nbsp;&nbsp;&nbsp;⇣ <a href="https://gitlab.com/Tsoukie/tsoukiepartytracker/-/releases" target="_blank">Tsoukie Party Tracker</a>
 
+#### &nbsp;&nbsp;&nbsp;&nbsp;⇣ <a href="https://gitlab.com/Tsoukie/classicapi/-/releases" target="_blank">ClassicAPI</a> <code>Required</code>
 
-# ❤️ Support & Credit
- 
-If you wish to show some support you can do so [here](https://streamlabs.com/tsoukielol/tip). Tips are completely voluntary and aren't required to download my projects, however, they are _very_ much appreciated. They allow me to devote more time to creating things I truly enjoy. 💜
+Required Client Version: 3.3.5a (Vanilla, TBC, WotLK) | <a href="https://gitlab.com/Tsoukie/tsoukiepartytracker/-/releases" target="_blank">⌕ All Releases</a>
 
-<!-- blank line -->
-<br>
-<!-- blank line -->
-  
-_This_ addon has been created and maintained by [Tsoukie](https://gitlab.com/Tsoukie/) and is **not** related or affiliated with any other version.
+<details>
+<summary>Installation Instructions</summary>
+
+1. Extract the downloaded compressed files _(eg. Right-Click -> Extract-All)_.
+2. Navigate within each extracted folder(s) looking for the following: `TPT` or `!!!ClassicAPI`.
+3. Move folder(s) named `TPT` or `!!!ClassicAPI` to your client `Interface\AddOns\` folder.
+4. Re-launch client.
+
+**Directory Structure:**
+<pre>
+Client Directory
+└── Interface
+    └── AddOns
+        └── TPT
+            └── TPT.toc
+            └── ...
+</pre>
+</details>
+
+<br />
+
+# Reporting Issues
+
+If you experience any problems, please report the issue [here](https://gitlab.com/Tsoukie/tsoukiepartytracker/-/issues). Doing so is the best way for us track and prioritize concerns effectively, giving us time to evaluate and investigate issues. Your contributions are valuable in improving the project for everyone!
+
+<br />
+
+# Acknowledgments
+
+This project is maintained by [**Tsoukie**](https://gitlab.com/Tsoukie/) and is **not** related or affiliated with any other version.
+
+My projects started as personal endeavors, driven by my own interests and passions. While tips are not necessary, they are genuinely appreciated and help in sustaining ongoing development and improvements. If you're feeling generous enough to buy me a coffee, you can do so [**here**](https://streamlabs.com/tsoukielol/tip). 💜
+
+#### ⋮ CONTRIBUTORS
+
+None
