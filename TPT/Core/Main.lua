@@ -34,7 +34,7 @@ local ZONE_TYPE
 local ZONE_TYPE_PREVIOUS
 
 local GROUP_ID
-local GROUP_TYPE
+local GROUP_TYPE_RAID
 local GROUP_SUB_SIZE
 
 local QUERY_SPEC
@@ -289,7 +289,7 @@ local function Attach(Anchor)
 
 		if ( UNIT_FRAME == "CompactRaidFrame" ) then
 			if ( CompactRaidFrameManager_GetSetting("KeepGroupsTogether") ) then
-				if ( GROUP_TYPE == "raid" ) then
+				if ( GROUP_TYPE_RAID ) then
 					AddOn = "CompactRaidGroup1Member"
 				else
 					AddOn = "CompactPartyFrameMember"
@@ -688,21 +688,19 @@ end
 
 function TPT:GROUP_ROSTER_UPDATE(UpdateType)
 	local GroupIDLast = GROUP_ID
-	local GroupTypeLast = GROUP_TYPE
+	local GroupTypeRaidLast = GROUP_TYPE_RAID
 	local GroupSubSizeLast = GROUP_SUB_SIZE or 0
 
 	GROUP_ID = UnitGUID("party1") -- Sub-Group Changes
-	GROUP_TYPE = IsInRaid() and "raid" or "party" -- Group Type Converted
+	GROUP_TYPE_RAID = IsInRaid() -- Group Type Converted
 	GROUP_SUB_SIZE = GetNumSubgroupMembers() -- Sub-Group Size
 
-	if ( GROUP_ID ~= GroupIDLast or GROUP_TYPE ~= GroupTypeLast or GROUP_SUB_SIZE ~= GroupSubSizeLast or UpdateType ) then
-		if ( AddonEnabled() and not GROUP_UPDATE_QUEUED ) then
-			if ( GROUP_SUB_SIZE < GroupSubSizeLast and ZONE_TYPE_PREVIOUS ~= "pvp" ) then
-				GroupUpdate(false)
-			else
-				TimerAfter(.7, GroupUpdate)
-				GROUP_UPDATE_QUEUED = 1
-			end
+	if ( AddonEnabled() and not GROUP_UPDATE_QUEUED and (GROUP_ID ~= GroupIDLast or GROUP_TYPE_RAID ~= GroupTypeRaidLast or GROUP_SUB_SIZE ~= GroupSubSizeLast or UpdateType) ) then
+		if ( GROUP_SUB_SIZE < GroupSubSizeLast and ZONE_TYPE_PREVIOUS ~= "pvp" ) then
+			GroupUpdate(false)
+		else
+			TimerAfter(.7, GroupUpdate)
+			GROUP_UPDATE_QUEUED = 1
 		end
 	end
 end
