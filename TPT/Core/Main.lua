@@ -772,7 +772,8 @@ function TPT:PLAYER_ENTERING_WORLD()
 end
 
 local function TriggerCooldown(SpellName, Anchor)
-	if ( not Anchor.Spec ) then
+	if ( not Anchor.Spec or (TPT.Default.Spec[SpellName] and not Anchor.Spec[SpellName]) ) then
+		Anchor.Spec = nil
 		TPT:QuerySpecStart()
 	end
 
