@@ -121,8 +121,7 @@ local function Start(Anchor, Icon, SetCD)
 			ActionButton_ShowOverlayGlow(Icon)
 			Icon.overlay.animIn:Stop()
 			Icon.overlay.animOut:Play()
-			Icon.overlay.ants.animOut:Stop()
-			Icon.overlay.ants:Hide()
+			Icon.overlay.ants:SetSize(.01,.01)
 		end
 
 		if ( TPT.DB.Hidden ) then
