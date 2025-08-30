@@ -1,6 +1,4 @@
-<a><img src="https://gitlab.com/-/project/72272686/uploads/957164475df1d0eaf9c07abcf3e03a56/intro.jpg" width="100%" /></a>
-
-<br />
+Fork of https://gitlab.com/Tsoukie/tsoukiepartytracker for some quick and dirty adjustments
 
 # Tsoukie Party Tracker
 

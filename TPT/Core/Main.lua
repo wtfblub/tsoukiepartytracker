@@ -161,10 +161,18 @@ function TPT:IconUpdate(i)
 					Icon:SetPoint(TPT.DB.Left and "BOTTOMRIGHT" or "BOTTOMLEFT", Anchor[LastIndex], TPT.DB.Left and "TOPLEFT" or "TOPRIGHT", TPT.DB.Left and -1 * TPT.DB.SpaceX or TPT.DB.SpaceX, TPT.DB.SpaceX)
 				end
 			else
-				if ( Count == 1 ) then	
-					Icon:SetPoint(TPT.DB.Left and "TOPRIGHT" or "TOPLEFT", Anchor, TPT.DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", TPT.DB.Left and -1 * TPT.DB.SpaceX or TPT.DB.SpaceX, 0)
+				if ( Count == 1 ) then
+					if ( TPT.DB.GrowDown ) then
+						Icon:SetPoint("TOP", Anchor, "BOTTOM", 0, -1 * TPT.DB.SpaceX)
+					else
+						Icon:SetPoint(TPT.DB.Left and "TOPRIGHT" or "TOPLEFT", Anchor, TPT.DB.Left and "BOTTOMLEFT" or "BOTTOMRIGHT", TPT.DB.Left and -1 * TPT.DB.SpaceX or TPT.DB.SpaceX, 0)
+					end
 				else
-					Icon:SetPoint(TPT.DB.Left and "RIGHT" or "LEFT", Anchor[LastIndex], TPT.DB.Left and "LEFT" or "RIGHT", TPT.DB.Left and -1 * TPT.DB.SpaceX or TPT.DB.SpaceX, 0)
+					if ( TPT.DB.GrowDown ) then
+						Icon:SetPoint("TOP", Anchor[LastIndex], "BOTTOM", 0, -1 * TPT.DB.SpaceX)
+					else
+						Icon:SetPoint(TPT.DB.Left and "RIGHT" or "LEFT", Anchor[LastIndex], TPT.DB.Left and "LEFT" or "RIGHT", TPT.DB.Left and -1 * TPT.DB.SpaceX or TPT.DB.SpaceX, 0)
+					end
 				end
 			end
 

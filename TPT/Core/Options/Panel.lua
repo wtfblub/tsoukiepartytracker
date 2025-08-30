@@ -34,7 +34,7 @@ function TPT.OptionOnLoad(Self, AddonName)
 	end
 
 	local Header, Parent, Attach, Lock,
-	Display, Scale, Hidden, Glow, Fade, GrowLeft, Rows, Tooltip,
+	Display, Scale, Hidden, Glow, Fade, GrowLeft, GrowDown, Rows, Tooltip,
 	Position, OffsetX, OffsetY, Padding,
 	Zone, Arena, Dungeon, World,
 	Ability, Trinket, Racial, Scroll, ScrollChild, Class, ClassTab, ClassAdd,
@@ -340,7 +340,7 @@ function TPT.OptionOnLoad(Self, AddonName)
 
 			--[[ Display ]]
 
-			Display = TPT.CreateContainer(Parent, nil, 580, 75)
+			Display = TPT.CreateContainer(Parent, nil, 580, 100)
 			Display:SetPoint("TOP", Parent, "TOP", 0, -10)
 
 			-------------
@@ -382,6 +382,13 @@ function TPT.OptionOnLoad(Self, AddonName)
 				true)
 			GrowLeft:SetPoint("TOP", Hidden, "BOTTOM", 0, 0)
 
+			GrowDown = TPT.CreateCheck(Panel, "Grow Down",
+				function() return TPT.DB.GrowDown end,
+				function(_, Value) Update("Position", "GrowDown", Value) Update("Icons") end,
+				"Grow icons down.",
+				true)
+			GrowDown:SetPoint("LEFT", GrowLeft, "RIGHT", 100, 0)
+
 			Rows = TPT.CreateCheck(Panel, "Two Rows",
 				function() return TPT.DB.Rows end,
 				function(_, Value)
@@ -389,14 +396,14 @@ function TPT.OptionOnLoad(Self, AddonName)
 				end,
 				"Icons on two rows.",
 				true)
-			Rows:SetPoint("LEFT", GrowLeft, "RIGHT", 100, 0)
+			Rows:SetPoint("LEFT", GrowDown, "RIGHT", 100, 0)
 
 			Tooltip = TPT.CreateCheck(Panel, "Tooltip",
 				function() return TPT.DB.Tooltip end,
 				function(_, Value) Update(nil, "Tooltip", Value) end,
 				"Tooltip on mouseover.",
 				true)
-			Tooltip:SetPoint("LEFT", Rows, "RIGHT", 100, 0)
+			Tooltip:SetPoint("TOP", GrowLeft, "BOTTOM", 0, 0)
 
 			--[[ POSITION ]]
 
