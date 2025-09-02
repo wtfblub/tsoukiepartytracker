@@ -114,7 +114,12 @@ end
 
 local function Start(Anchor, Icon, SetCD)
 	if ( Icon.Name ) then
-		CooldownFrame_Set(Icon.Swipe, GetTime(), SetCD or Icon.CD, 1)
+		local duration = SetCD or Icon.CD
+		CooldownFrame_Set(Icon.Swipe, GetTime(), duration, 1)
+		if ( OmniCC and OmniCC.Timer and duration > OmniCC:GetMinDuration() ) then
+			local timer = OmniCC.Timer:Get(Icon.Swipe) or OmniCC.Timer:New(Icon.Swipe)
+			timer:Start(GetTime(), duration)
+		end
 
 		if ( TPT.DB.Glow and not SetCD ) then
 			-- Flash
